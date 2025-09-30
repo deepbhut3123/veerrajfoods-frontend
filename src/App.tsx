@@ -1,25 +1,47 @@
 import React from 'react';
-import logo from './logo.svg';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Master from './MasterLayout/Master';
+import { AdminRoutes } from './Route';
 import './App.css';
+import './index.css';
+// import NotFound from './Components/NotFound';
+import Login from './Auth/Login';
+import { AuthProvider } from './Auth/AuthContext';
+import Register from './Auth/Register';
+import PrivateRoute from './Auth/privateRoute';
+import Dashboard from './DesignLayout/Dashboard';
+// import Notifications from './Pages/Notification';
+// import { SettingsProvider } from './Pages/Settings/SettingContext';
 
-function App() {
+const App: React.FC = () => {
+
+  const token = localStorage.getItem('token');
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <>
+ <AuthProvider>
+   {/* <SettingsProvider> */}
+      {/* <Notifications /> */}
+      <BrowserRouter>     
+
+        <Routes>
+        <Route path="*" element={<Navigate replace to="/login" />} />
+          <Route path='/login' element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route element={<PrivateRoute  children={<Dashboard />} />}>
+            {AdminRoutes.map((route) => (
+              <Route
+                key={route.path}
+                path={route.path}
+                element={<Master children={<route.component />} />}
+                />
+            ))}
+          </Route>
+        </Routes>
+      </BrowserRouter>
+      {/* </SettingsProvider> */}
+      </AuthProvider>
+    </>
   );
 }
 
