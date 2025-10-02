@@ -92,9 +92,6 @@ const Master: React.FC<MasterProps> = ({ children }) => {
                     forceCollapse={true} // 👈 Add this!
                 />
 
-
-
-
                 <Layout
                     style={{
                         flex: 1,

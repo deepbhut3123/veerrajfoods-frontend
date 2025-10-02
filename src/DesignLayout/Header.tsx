@@ -110,7 +110,9 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
 
   const notificationMenu = (
     <div onClick={(e) => e.stopPropagation()}>
-      <Menu style={{ borderRadius: "8px", maxHeight: "300px", overflowY: "auto" }}>
+      <Menu
+        style={{ borderRadius: "8px", maxHeight: "300px", overflowY: "auto" }}
+      >
         {taskLogs.length > 0 ? (
           taskLogs.map((log, index) => (
             <Menu.Item
@@ -138,12 +140,21 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
 
   return (
     <>
-      <Header className="header" style={{ padding: "0 16px" }}>
+      <Header
+        className="header"
+        style={{
+          padding: "0 16px",
+          backgroundColor: "#E0F7F6", // light teal to match sidebar
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)", // optional subtle shadow
+        }}
+      >
         <Row justify="space-between" align="middle" gutter={[16, 16]}>
           <Col xs={4} sm={3} md={2} lg={1}>
             <Button
               type="text"
-              icon={<MenuOutlined style={{ fontSize: "20px" }} />}
+              icon={
+                <MenuOutlined style={{ fontSize: "20px", color: "#004d40" }} />
+              } // darker teal for contrast
               style={{ background: "transparent" }}
               onClick={toggleSidebar}
             />
@@ -151,20 +162,23 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
 
           <Col>
             <Row align="middle" gutter={16}>
-
               <Col>
-                <Dropdown overlay={userMenu} trigger={["click"]} placement="bottomRight">
+                <Dropdown
+                  overlay={userMenu}
+                  trigger={["click"]}
+                  placement="bottomRight"
+                >
                   <Avatar
                     style={{
                       cursor: "pointer",
-                      backgroundColor: "#d9d9d9",
+                      backgroundColor: "#b2dfdb", // slightly darker teal for avatar contrast
                       width: "40px",
                       height: "40px",
                       marginBottom: "16px",
                     }}
                     icon={
                       !userPhoto || typeof userPhoto !== "string" ? (
-                        <UserOutlined />
+                        <UserOutlined style={{ color: "#004d40" }} />
                       ) : undefined
                     }
                     src={avatarSrc}
@@ -190,23 +204,25 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
         style={{
           bottom: 20,
           top: 20,
-          maxHeight: 'calc(100vh - 3  0px)', // Leaves 20px space at bottom
-          margin: '0 auto',
-          position: 'relative',
+          maxHeight: "calc(100vh - 3  0px)", // Leaves 20px space at bottom
+          margin: "0 auto",
+          position: "relative",
           // paddingBottom: 20 // Adds space inside modal at bottom
         }}
         title={
-          <div style={{
-            marginLeft: "11px",
-            width: '100%',
-            paddingRight: 20, // Optional: Adjust spacing
-          }}>
+          <div
+            style={{
+              marginLeft: "11px",
+              width: "100%",
+              paddingRight: 20, // Optional: Adjust spacing
+            }}
+          >
             Notification
           </div>
         }
         bodyStyle={{
           // maxHeight: 'calc(90vh - 55px)',
-          overflowY: 'auto',
+          overflowY: "auto",
           // padding: '20px',
           fontFamily: "inter, sans-serif",
         }}
@@ -214,18 +230,20 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
           header: {
             borderBottom: "1px solid #e0e0e0",
             padding: "12px",
-            position: 'sticky',
+            position: "sticky",
             top: 0,
-            backgroundColor: 'white',
+            backgroundColor: "white",
           },
           content: {
             padding: 10,
-            overflow: 'hidden'
-          }
+            overflow: "hidden",
+          },
         }}
       >
         <div className="elements">
-          <p style={{ padding: "1vw" }}>{selectedNotification?.message || "No message available"}</p>
+          <p style={{ padding: "1vw" }}>
+            {selectedNotification?.message || "No message available"}
+          </p>
         </div>
         <div className="footer-modals" />
       </Modal>

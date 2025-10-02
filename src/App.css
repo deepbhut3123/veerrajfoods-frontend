@@ -856,3 +856,23 @@ element.style {
     scrollbar-width: thin;
     scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
 }
+
+/* Normal item */
+.ant-menu-item {
+  color: #004d40 !important; /* dark teal */
+  font-weight: 500;
+}
+
+/* Hover state */
+.ant-menu-item:hover {
+  background-color: #b2dfdb !important; /* light teal */
+  color: #00695c !important;
+}
+
+/* Selected item */
+.ant-menu-item-selected {
+  background-color: #26a69a !important; /* medium teal */
+  color: white !important;
+  font-weight: 600;
+  border-radius: 6px;
+}

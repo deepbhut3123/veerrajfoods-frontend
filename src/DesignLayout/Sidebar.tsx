@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { Drawer, Layout, Menu } from "antd";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { DashboardOutlined, FileTextOutlined, ShopOutlined, ShoppingCartOutlined, SolutionOutlined } from "@ant-design/icons";
+import {
+  DashboardOutlined,
+  FileTextOutlined,
+  ShopOutlined,
+  ShoppingCartOutlined,
+  SolutionOutlined,
+} from "@ant-design/icons";
 // import { AuthContext } from "../Auth/AuthContext";
 import "../MasterLayout/Master.css";
 
@@ -25,44 +31,46 @@ const Sidebar: React.FC<SidebarProps> = ({
   onCollapse,
   isSmallScreen,
   disableHover,
-  onItemClick
+  onItemClick,
 }) => {
-  const Logo_Main = require("../Assets/logo.png");
+  const Logo_Main = require("../Assets/VEERRAJLOGOR.jpg");
   const navigate = useNavigate();
   const location = useLocation();
   const [isHovering, setIsHovering] = useState(false);
-  const [activeMenuItemKey, setActiveMenuItemKey] = useState<string | null>(null);
+  const [activeMenuItemKey, setActiveMenuItemKey] = useState<string | null>(
+    null
+  );
   const [hoverEffectActive, setHoverEffectActive] = useState(true);
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
   const siderRef = useRef<HTMLDivElement>(null);
-//   const { authData } = useContext(AuthContext);
+  //   const { authData } = useContext(AuthContext);
 
   const menuItems = [
     {
       key: "dashboard",
       icon: <DashboardOutlined style={{ color: "inherit" }} />,
       text: "Dashboard",
-      link: "/dashboard"
+      link: "/dashboard",
     },
     {
       key: "dealers",
       icon: <ShopOutlined style={{ color: "inherit" }} />,
       text: "Dealers",
-      link: "/dealer"
+      link: "/dealer",
     },
     {
       key: "sales",
       icon: <FileTextOutlined style={{ color: "inherit" }} />,
       text: "Sales",
-      link: "/sales"
+      link: "/sales",
     },
     {
       key: "online-order",
       icon: <ShoppingCartOutlined style={{ color: "inherit" }} />,
       text: "Online Order",
-      link: "/online-order"
-    }
+      link: "/online-order",
+    },
   ];
 
   useEffect(() => {
@@ -80,9 +88,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     const routeTitles: Record<string, string> = {
-        "/dashboard": "Dashboard",
+      "/dashboard": "Dashboard",
       "/dealer": "Dealers",
-      "/sales": "Sales"
+      "/sales": "Sales",
     };
 
     let title = "Veerraj Food";
@@ -142,7 +150,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           bodyStyle={{
             backgroundColor: "#001529",
             padding: 0,
-            overflowY: "auto"
+            overflowY: "auto",
           }}
         >
           <div
@@ -150,7 +158,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               backgroundColor: "#001529",
               padding: "1rem 0",
               display: "flex",
-              justifyContent: "center"
+              justifyContent: "center",
             }}
           >
             <img src={Logo_Main} alt="logo" style={{ maxHeight: "8vw" }} />
@@ -167,7 +175,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                 icon={<span style={{ fontSize: "24px" }}>{item.icon}</span>}
                 onClick={() => handleMenuItemClick(item.key)}
               >
-                <Link to={item.link} style={{ textDecoration: "none", color: "inherit" }}>
+                <Link
+                  to={item.link}
+                  style={{ textDecoration: "none", color: "inherit" }}
+                >
                   {item.text}
                 </Link>
               </Menu.Item>
@@ -188,17 +199,18 @@ const Sidebar: React.FC<SidebarProps> = ({
             position: "fixed",
             height: "100vh",
             zIndex: 1000,
-            overflow: "hidden"
+            overflow: "hidden",
+            background: "linear-gradient(180deg, #E0F7F6 0%, #B2DFDB 100%)",
           }}
         >
           <div
             style={{
               textAlign: "center",
-              backgroundColor: "#001529",
+              backgroundColor: "#E0F7F6",
               marginBottom: "10px",
               padding: "10px 0",
               display: "flex",
-              justifyContent: "center"
+              justifyContent: "center",
             }}
           >
             <img
@@ -207,28 +219,39 @@ const Sidebar: React.FC<SidebarProps> = ({
               style={{
                 maxHeight: "70px",
                 transition: "all 0.2s",
-                width: collapsed ? "60px" : "auto"
+                width: collapsed ? "60px" : "auto",
               }}
             />
           </div>
+
           <Menu
             mode="inline"
-            theme="dark"
             selectedKeys={[activeMenuItemKey || ""]}
-            style={{ color: "white", width: "100%" }}
-          >
-            {menuItems.map((item) => (
-              <Menu.Item
-                key={item.key}
-                icon={<span style={{ fontSize: "24px" }}>{item.icon}</span>}
-                onClick={() => handleMenuItemClick(item.key)}
-              >
-                <Link to={item.link} style={{ textDecoration: "none", color: "inherit" }}>
+            style={{
+              backgroundColor: "transparent", // let gradient show
+              borderRight: "none",
+            }}
+            items={menuItems.map((item) => ({
+              key: item.key,
+              icon: (
+                <span style={{ fontSize: "20px", color: "#00695C" }}>
+                  {item.icon}
+                </span>
+              ),
+              label: (
+                <Link
+                  to={item.link}
+                  style={{
+                    textDecoration: "none",
+                    color: "#004D40", // default font
+                    fontWeight: 500,
+                  }}
+                >
                   {item.text}
                 </Link>
-              </Menu.Item>
-            ))}
-          </Menu>
+              ),
+            }))}
+          />
         </Sider>
       )}
     </>

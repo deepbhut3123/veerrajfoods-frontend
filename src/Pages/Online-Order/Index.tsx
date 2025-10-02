@@ -5,16 +5,12 @@ import {
   Modal,
   Form,
   Input,
-  InputNumber,
   Space,
   message,
-  Popconfirm,
-  Divider,
   Typography,
   Row,
   Col,
   Card,
-  Collapse,
   List,
   Tag,
   DatePicker,
@@ -39,13 +35,12 @@ import {
   EditOutlined,
   PrinterOutlined,
   CopyOutlined,
+  ExportOutlined,
+  TruckOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
 
 const { Title } = Typography;
-const { Panel } = Collapse;
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
@@ -88,6 +83,7 @@ const OnlineOrders: React.FC = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [selectedRows, setSelectedRows] = useState<Order[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
+  const logo = require("../../Assets/VEERRAJLOGOR.jpg");
 
   const showToast = (text: string, type: "success" | "error" = "success") => {
     const toast = document.createElement("div");
@@ -281,6 +277,121 @@ const OnlineOrders: React.FC = () => {
     }
   };
 
+  // live grand total calculation
+  const updateTotals = () => {
+    const products = form.getFieldValue("products") || [];
+
+    // recalc each product total
+    const updatedProducts = products.map((p: any) => ({
+      ...p,
+      total: (p?.productPrice || 0) * (p?.quantity || 0),
+    }));
+
+    const total = updatedProducts.reduce(
+      (sum: number, p: any) => sum + (p.total || 0),
+      0
+    );
+
+    // update fields
+    form.setFieldsValue({ products: updatedProducts, totalAmount: total });
+    setGrandTotal(total);
+  };
+
+  const handlePrintSelected = () => {
+    if (selectedRows.length === 0) {
+      message.warning("Please select at least one order to print.");
+      return;
+    }
+
+    const printWindow = window.open("", "", "width=900,height=650");
+    if (!printWindow) return;
+
+    const companyLogo = logo;
+    const companyName = "VEERRAAJ FOODS";
+    const companyContact = "AHMEDABAD - 90994 00116";
+
+    let htmlContent = `
+    <html>
+      <head>
+        <title>Customer Info</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+          .page { 
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* 2 columns */
+            gap: 12px 20px; /* row gap, column gap */
+          }
+          .record {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 13px;
+            line-height: 1.4;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 200px; /* enough height for logo/footer */
+            box-sizing: border-box;
+            break-inside: avoid; /* prevent splitting across pages */
+            page-break-inside: avoid; /* older browsers */
+          }
+          .record h3 {
+            margin: 0 0 6px 0;
+            font-size: 14px;
+            color: #333;
+          }
+          .record p {
+            margin: 2px 0;
+          }
+          .company-footer {
+            display: flex;
+            align-items: center;
+            margin-top: 8px;
+            border-top: 1px solid #ccc;
+            padding-top: 5px;
+            gap: 12px;
+            font-size: 12px;
+          }
+          .company-footer img {
+            height: 30px;
+            margin-left: 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="page">
+  `;
+
+    selectedRows.forEach((record) => {
+      htmlContent += `
+      <div class="record">
+        <div>
+          <h3>${record.customerName || "N/A"}</h3>
+          <p><strong>Mobile:</strong> ${record.phoneNo || "-"}</p>
+          <p><strong>Address:</strong> ${record.area || "-"}</p>
+        </div>
+        <div class="company-footer">
+          <img src="${companyLogo}" alt="Company Logo" />
+          <div>
+            <div><strong>From:</strong> ${companyName}</div>
+            <div>${companyContact}</div>
+          </div>
+        </div>
+      </div>
+    `;
+    });
+
+    htmlContent += `</div></body></html>`;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      printWindow.print();
+      printWindow.close();
+    };
+  };
+
   const columns = [
     {
       title: "#",
@@ -291,54 +402,45 @@ const OnlineOrders: React.FC = () => {
       render: (_text: any, _record: any, index: number) => index + 1,
     },
     {
-      title: "Order Date",
+      title: "Date",
       dataIndex: "orderDate",
       width: 110,
       render: (date: string) => {
         if (!date) return "-";
         const d = new Date(date);
-        return d.toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        }); // dd-mm-yyyy
+        return d
+          .toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "2-digit",
+          })
+          .replace(/\//g, " - "); // dd-mm-yyyy
       },
     },
-    { title: "Customer Name", dataIndex: "customerName", width: 130 },
-    { title: "Phone No", dataIndex: "phoneNo", width: 130 },
-    { title: "Area", dataIndex: "area", width: 150 },
-    { title: "Courier", dataIndex: "courier", width: 100 },
-    { title: "Tracking No", dataIndex: "trackingNumber", width: 110 },
-    { title: "Total Amount", dataIndex: "totalAmount", width: 130 },
+    { title: "Name", dataIndex: "customerName", width: 150 },
     {
-      title: "Source",
-      dataIndex: "orderSource",
+      title: "Phone No",
+      dataIndex: "phoneNo",
       width: 130,
-      render: (source: string) => {
-        if (!source) return "—";
+      render: (text: string) => {
+        if (!text) return "";
 
-        const colors: any = {
-          Website: { bg: "#e6f4ff", color: "#1677ff" },
-          WhatsApp: { bg: "#f6ffed", color: "#52c41a" },
-          App: { bg: "#fff7e6", color: "#fa8c16" },
-          Manual: { bg: "#fff0f6", color: "#eb2f96" },
-        };
+        // Remove all spaces first
+        const cleaned = text.replace(/\s+/g, "");
 
-        const style = {
-          background: colors[source]?.bg || "#f0f0f0",
-          color: colors[source]?.color || "#000",
-          borderRadius: "6px",
-          padding: "2px 8px",
-          fontSize: "12px",
-          fontWeight: 500,
-        };
+        // Insert a space after 5 digits if not already formatted
+        if (cleaned.length === 10) {
+          return cleaned.replace(/(\d{5})(\d{5})/, "$1 $2");
+        }
 
-        return <span style={style}>{source}</span>;
+        return text; // fallback
       },
     },
-
+    { title: "Address", dataIndex: "area" },
+    { title: "Total", dataIndex: "totalAmount", width: 100 },
     {
       title: "Action",
+      width: 150,
       render: (_: any, record: Order) => (
         <>
           <div style={{ display: "flex", justifyContent: "center", gap: 4 }}>
@@ -367,58 +469,27 @@ const OnlineOrders: React.FC = () => {
                 )}
               </div>
             </Tooltip>
-            {/* Print */}
-            <Tooltip title="Print">
+            <Tooltip title="Copy Tracking No">
               <div
-                onClick={(e) => {
-                  e.stopPropagation(); // prevent expand toggle
-                  const printWindow = window.open(
-                    "",
-                    "",
-                    "width=350,height=400"
-                  );
+                onClick={() => {
+                  const msg = `Good news! 🎉 
 
-                  if (printWindow) {
-                    printWindow.document.write(`
-        <html>
-          <head>
-            <title>Customer Info</title>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                padding: 20px;
-                margin: 0;
-              }
-              h2 { color: #333; margin-bottom: 12px; }
-              p { font-size: 14px; margin: 6px 0; }
+Hello, ${record.customerName}
+Your order has been shipped.
 
-              /* Print styling */
-              @media print {
-                body {
-                  width: 60mm;         /* ✅ restrict width */
-                  margin: 0;
-                  padding: 10px;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            <h2>Customer Information</h2>
-            <p><strong>Name:</strong> ${record.customerName}</p>
-            <p><strong>Mobile:</strong> ${record.phoneNo}</p>
-            <p><strong>Address:</strong> ${record.area}</p>
-          </body>
-        </html>
-      `);
+🔍 Tracking ID: ${record.trackingNumber}
+🌐 Track your order here: [Tracking Link]
 
-                    printWindow.document.close();
+Thank you for shopping with us! 😊
 
-                    // Wait a tick so styles apply before printing
-                    printWindow.onload = () => {
-                      printWindow.print();
-                      printWindow.close();
-                    };
-                  }
+- VEERRAAJ FOODS - Ahmedabad`;
+
+                  navigator.clipboard
+                    .writeText(msg)
+                    .then(() => showToast("Customer tracking message copied!", "success"))
+                    .catch(() =>
+                      showToast("Failed to copy tracking number", "error")
+                    );
                 }}
                 style={{
                   cursor: "pointer",
@@ -428,22 +499,23 @@ const OnlineOrders: React.FC = () => {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  background: "linear-gradient(135deg, #00c6ff, #0072ff)",
+                  background: "linear-gradient(135deg, #ff9966, #ff5e62)",
                   boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
                   transition: "all 0.3s",
                 }}
               >
-                <PrinterOutlined style={{ fontSize: 16, color: "#fff" }} />
+                <TruckOutlined style={{ fontSize: 16, color: "#fff" }} />
               </div>
             </Tooltip>
-            <Tooltip title="Copy Tracking No">
+            <Tooltip title="Copy Customer Detail">
               <div
                 onClick={() => {
-                  const msg = `📦 Your order has been placed successfully!\n\n🆔 Tracking Number: ${record.trackingNumber}\n\nYou can use this tracking number to check the delivery status. 🚚`;
+                  const msg = `Customer Name:- ${record.customerName}
+                  Contact Number:- ${record.phoneNo}`
 
                   navigator.clipboard
                     .writeText(msg)
-                    .then(() => showToast("Tracking number copied!", "success"))
+                    .then(() => showToast("Customer details copied!", "success"))
                     .catch(() =>
                       showToast("Failed to copy tracking number", "error")
                     );
@@ -483,53 +555,11 @@ const OnlineOrders: React.FC = () => {
                 <EditOutlined style={{ fontSize: 16, color: "#fff" }} />
               </div>
             </Tooltip>
-            <Tooltip title="Delete">
-              <div
-                onClick={() => {
-                  setSelectedOrder(record);
-                  setDeleteModalVisible(true);
-                }}
-                style={{
-                  cursor: "pointer",
-                  width: 30,
-                  height: 30,
-                  borderRadius: 20,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "linear-gradient(135deg, #ff4e50, #f9d423)",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-                  transition: "all 0.3s",
-                }}
-              >
-                <DeleteOutlined style={{ fontSize: 16, color: "#fff" }} />
-              </div>
-            </Tooltip>
           </div>
         </>
       ),
     },
   ];
-
-  // live grand total calculation
-  const updateTotals = () => {
-    const products = form.getFieldValue("products") || [];
-
-    // recalc each product total
-    const updatedProducts = products.map((p: any) => ({
-      ...p,
-      total: (p?.productPrice || 0) * (p?.quantity || 0),
-    }));
-
-    const total = updatedProducts.reduce(
-      (sum: number, p: any) => sum + (p.total || 0),
-      0
-    );
-
-    // update fields
-    form.setFieldsValue({ products: updatedProducts, totalAmount: total });
-    setGrandTotal(total);
-  };
 
   return (
     <div
@@ -540,22 +570,33 @@ const OnlineOrders: React.FC = () => {
         fontFamily: "'Inter', sans-serif",
       }}
     >
-      <Row gutter={[16, 16]} align="middle" justify="space-between" wrap>
-        {/* Title */}
-        <Col xs={24} md={6}>
-          <Title level={3} style={{ margin: 0 }}>
-            Order Details
-          </Title>
-        </Col>
-
-        {/* Search + RangePicker */}
-        <Col xs={24} md={12}>
+      <Row
+        gutter={[16, 16]}
+        align="middle"
+        justify="space-between"
+        style={{ marginBottom: 16 }}
+        wrap={false} // prevent wrapping to new line
+      >
+        {/* Left side: Title + Search + RangePicker */}
+        <Col flex="auto">
           <Space
-            direction={window.innerWidth < 768 ? "vertical" : "horizontal"}
-            style={{ width: "100%", justifyContent: "center" }}
+            align="center"
+            wrap={false}
+            style={{ width: "100%", flexWrap: "nowrap" }}
           >
+            <Title
+              level={3}
+              style={{
+                margin: 0,
+                minWidth: 180,
+                textAlign: window.innerWidth < 768 ? "center" : "left",
+              }}
+            >
+              Order Details
+            </Title>
+
             <Input.Search
-              placeholder="Search by customer, phone, area..."
+              // placeholder="Search by customer, phone, area..."
               allowClear
               onSearch={(value) => {
                 const [startDate, endDate] = selectedDateRange || [];
@@ -564,10 +605,11 @@ const OnlineOrders: React.FC = () => {
                   ...(startDate && endDate ? { startDate, endDate } : {}),
                 });
               }}
-              style={{ width: "100%", maxWidth: 250 }}
+              style={{ flex: 1, minWidth: 200, maxWidth: 240 }}
             />
+
             <RangePicker
-              style={{ width: "100%", maxWidth: 300 }}
+              style={{ flex: 1, minWidth: 220, maxWidth: 260 }}
               onChange={(dates, dateStrings) => {
                 const [startDate, endDate] = dateStrings;
                 setSelectedDateRange(dateStrings);
@@ -581,67 +623,86 @@ const OnlineOrders: React.FC = () => {
           </Space>
         </Col>
 
-        {/* Buttons */}
-        <Col
-          xs={24}
-          md={6}
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: "12px",
-            flexWrap: "wrap",
-          }}
-        >
-          <Button
-            type="primary"
-            icon={<PlusCircleOutlined size={18} />}
-            onClick={() => setIsModalOpen(true)}
-            style={{
-              background: "#4b6cb7",
-              borderColor: "#4b6cb7",
-              padding: "6px 16px",
-              borderRadius: "8px",
-            }}
-          >
-            Add Details
-          </Button>
-          <Button
-            type="default"
-            onClick={handleExportExcel}
-            disabled={selectedRows.length === 0}
-            style={{
-              background:
-                selectedRows.length === 0
-                  ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)" // grey gradient for disabled
-                  : "linear-gradient(135deg, #28a745 0%, #85d96b 100%)", // green gradient
-              border: "none",
-              color: selectedRows.length === 0 ? "#888" : "#fff",
-              borderRadius: "8px",
-              padding: "6px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              boxShadow:
-                selectedRows.length === 0
-                  ? "none"
-                  : "0 3px 6px rgba(0,0,0,0.1)", // remove shadow when disabled
-              cursor: selectedRows.length === 0 ? "not-allowed" : "pointer", // show blocked cursor
-            }}
-          >
-            <i
-              className="fas fa-file-excel"
+        {/* Right side: Buttons */}
+        <Col>
+          <Space wrap={false}>
+            <Tooltip title="Add Details">
+            <Button
+              type="primary"
+              icon={<PlusCircleOutlined size={18} />}
+              onClick={() => setIsModalOpen(true)}
               style={{
-                fontSize: 16,
-                opacity: selectedRows.length === 0 ? 0.5 : 1,
+                background: "#4b6cb7",
+                borderColor: "#4b6cb7",
+                padding: "6px 16px",
+                borderRadius: "8px",
               }}
-            />
-            Export Excel
-          </Button>
+            ></Button>
+            </Tooltip>
+
+              <Tooltip title="Export Excel">
+            <Button
+              type="default"
+              icon={<ExportOutlined size={18} />}
+              onClick={handleExportExcel}
+              disabled={selectedRows.length === 0}
+              style={{
+                background:
+                  selectedRows.length === 0
+                    ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
+                    : "linear-gradient(135deg, #28a745 0%, #85d96b 100%)",
+                border: "none",
+                color: selectedRows.length === 0 ? "#888" : "#fff",
+                borderRadius: "8px",
+                padding: "6px 16px",
+              }}
+            ></Button>
+            </Tooltip>
+
+            <Tooltip title="Print">
+            <Button
+              type="default"
+              onClick={handlePrintSelected}
+              disabled={selectedRows.length === 0}
+              style={{
+                background:
+                  selectedRows.length === 0
+                    ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
+                    : "linear-gradient(135deg, #0072ff 0%, #00c6ff 100%)",
+                border: "none",
+                color: selectedRows.length === 0 ? "#888" : "#fff",
+                borderRadius: "8px",
+                padding: "6px 16px",
+              }}
+            >
+              <PrinterOutlined style={{ fontSize: 16 }} />
+            </Button>
+</Tooltip>
+<Tooltip title="Delete">
+            <Button
+              type="default"
+              danger
+              onClick={() => setDeleteModalVisible(true)}
+              disabled={selectedRows.length === 0}
+              style={{
+                background:
+                  selectedRows.length === 0
+                    ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
+                    : "linear-gradient(135deg, #ff4e50 0%, #f9d423 100%)",
+                border: "none",
+                color: selectedRows.length === 0 ? "#888" : "#fff",
+                borderRadius: "8px",
+                padding: "6px 16px",
+              }}
+            >
+              <DeleteOutlined style={{ fontSize: 16 }} />
+            </Button>
+            </Tooltip>
+          </Space>
         </Col>
       </Row>
 
-      <Card
+      {/* <Card
         style={{
           borderRadius: "20px",
           //   padding: "14px",
@@ -650,92 +711,122 @@ const OnlineOrders: React.FC = () => {
           marginTop: "28px",
           height: "100%",
         }}
-      >
-        <Table
-          rowKey="_id"
-          columns={columns}
-          dataSource={orders}
-          loading={loading}
-          pagination={false}
-          rowSelection={rowSelection}
-          scroll={{ x: 1300, y: 450 }}
-          // style={{ scrollbarWidth: "thin" }}
-          expandable={{
-            expandedRowKeys,
-            expandIcon: () => null, // remove default plus
-            expandIconColumnIndex: -1,
-            expandedRowRender: (record) => (
-              <AnimatePresence initial={false}>
-                {expandedRowKeys.includes(record._id) && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                    style={{ overflow: "hidden" }}
+      > */}
+      <Table
+        rowKey="_id"
+        columns={columns}
+        dataSource={orders}
+        loading={loading}
+        pagination={false}
+        rowSelection={rowSelection}
+        scroll={{ x: 1300, y: 650 }}
+        // style={{ scrollbarWidth: "thin" }}
+        expandable={{
+          expandedRowKeys,
+          expandIcon: () => null, // remove default plus
+          expandIconColumnIndex: -1,
+          expandedRowRender: (record) => (
+            <AnimatePresence initial={false}>
+              {expandedRowKeys.includes(record._id) && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  style={{ overflow: "hidden", padding: "8px 0" }}
+                >
+                  {/* Products List */}
+                  <List
+                    dataSource={record.products}
+                    renderItem={(item) => (
+                      <List.Item
+                        style={{
+                          background: "#fff",
+                          borderRadius: 8,
+                          padding: "8px 16px",
+                          marginBottom: 6,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                        }}
+                      >
+                        {/* Product name */}
+                        <Text strong style={{ fontSize: 14, flex: 1 }}>
+                          {item.productName}
+                        </Text>
+
+                        {/* Price / Qty / Total */}
+                        <div style={{ display: "flex", gap: 12, flex: 1 }}>
+                          <Tag
+                            color="blue"
+                            style={{ fontSize: 12, padding: "2px 6px" }}
+                          >
+                            ₹{item.productPrice}
+                          </Tag>
+                          <Tag
+                            color="green"
+                            style={{ fontSize: 12, padding: "2px 6px" }}
+                          >
+                            Qty: {item.quantity}
+                          </Tag>
+                          <Tag
+                            color="purple"
+                            style={{ fontSize: 12, padding: "2px 6px" }}
+                          >
+                            ₹{item.total}
+                          </Tag>
+                        </div>
+                      </List.Item>
+                    )}
+                  />
+
+                  {/* Courier & Tracking - shown only once */}
+                  <div
+                    style={{
+                      marginTop: 8,
+                      display: "flex",
+                      gap: 12,
+                      padding: "8px 16px",
+                      background: "#fafafa",
+                      borderRadius: 8,
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                    }}
                   >
-                    <List
-                      dataSource={record.products}
-                      renderItem={(item) => (
-                        <List.Item
-                          style={{
-                            background: "#fff",
-                            borderRadius: 8,
-                            padding: "8px 16px",
-                            marginBottom: 6,
-                            display: "flex",
-                            maxWidth: "600px",
-                            alignItems: "center",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                          }}
-                        >
-                          <Text strong style={{ fontSize: 14 }}>
-                            {item.productName}
-                          </Text>
-                          <div style={{ display: "flex", gap: 12 }}>
-                            <Tag
-                              color="blue"
-                              style={{ fontSize: 12, padding: "2px 6px" }}
-                            >
-                              ₹{item.productPrice}
-                            </Tag>
-                            <Tag
-                              color="green"
-                              style={{ fontSize: 12, padding: "2px 6px" }}
-                            >
-                              Qty: {item.quantity}
-                            </Tag>
-                            <Tag
-                              color="purple"
-                              style={{ fontSize: 12, padding: "2px 6px" }}
-                            >
-                              ₹{item.total}
-                            </Tag>
-                          </div>
-                        </List.Item>
-                      )}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            ),
-          }}
-        />
-      </Card>
+                    <Tag
+                      color="cyan"
+                      style={{ fontSize: 12, padding: "2px 6px" }}
+                    >
+                      Courier: {record.courier || "N/A"}
+                    </Tag>
+                    <Tag
+                      color="geekblue"
+                      style={{ fontSize: 12, padding: "2px 6px" }}
+                    >
+                      Tracking: {record.trackingNumber || "N/A"}
+                    </Tag>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          ),
+        }}
+      />
+      {/* </Card> */}
       <Modal
         title={
-          <Title level={4} style={{ margin: 0, color: "#4b6cb7" }}>
-            {isEditMode ? "Edit Online Order" : "Add New Online Order"}
+          <Title level={4} style={{ margin: 0, color: "#00695c" }}>
+            {isEditMode ? "Edit Order" : "Add New Order"}
           </Title>
         }
         open={isModalOpen}
         onCancel={handleCancel}
         footer={null}
-        width={800}
+        width={1200}
         centered
         bodyStyle={{
           padding: "32px",
-          backgroundColor: "#f9fbff",
+          backgroundColor: "#E0F7F6",
           borderRadius: "16px",
         }}
       >
@@ -744,57 +835,48 @@ const OnlineOrders: React.FC = () => {
           form={form}
           onFinish={handleSubmit} // ✅ unified submit
           onValuesChange={updateTotals}
-          style={{ gap: "24px", display: "flex", flexDirection: "column" }}
+          style={{ display: "flex", flexDirection: "column" }}
         >
           {/* Customer Info */}
-          <Row gutter={16}>
-            <Col span={12}>
+          <Row gutter={14}>
+            <Col span={8}>
               <Form.Item
                 label="Customer Name"
                 name="customerName"
                 rules={[{ required: true, message: "Enter customer name" }]}
               >
                 <Input
-                  placeholder="e.g. John Doe"
+                  // placeholder="e.g. John Doe"
                   style={{ borderRadius: 8, height: 40 }}
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 label="Phone No"
                 name="phoneNo"
-                rules={[{ required: true, message: "Enter phone number" }]}
+                rules={[
+                  { required: true, message: "Phone number is required" },
+                  {
+                    pattern: /^[0-9]{10}$/,
+                    message: "Phone number must be exactly 10 digits",
+                  },
+                ]}
               >
                 <Input
-                  placeholder="e.g. 9876543210"
+                  // placeholder="e.g. 9876543210"
                   style={{ borderRadius: 8, height: 40 }}
                 />
               </Form.Item>
             </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
-                label="Area"
+                label="Address"
                 name="area"
-                rules={[{ required: true, message: "Enter area" }]}
+                rules={[{ required: true, message: "Enter address" }]}
               >
                 <Input
-                  placeholder="e.g. Downtown"
-                  style={{ borderRadius: 8, height: 40 }}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="Weight"
-                name="weight"
-                rules={[{ required: true, message: "Enter weight" }]}
-              >
-                <Input
-                  placeholder="e.g. 2kg"
+                  // placeholder="e.g. Downtown"
                   style={{ borderRadius: 8, height: 40 }}
                 />
               </Form.Item>
@@ -831,7 +913,6 @@ const OnlineOrders: React.FC = () => {
                             background: "#fff",
                             border: "1px solid #e4eaf3",
                             borderRadius: 12,
-                            padding: "16px",
                             boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
                           }}
                         >
@@ -849,7 +930,7 @@ const OnlineOrders: React.FC = () => {
                                 ]}
                               >
                                 <Input
-                                  placeholder="e.g. Samsung AC"
+                                  // placeholder="e.g. Samsung AC"
                                   style={{ borderRadius: 6 }}
                                 />
                               </Form.Item>
@@ -865,28 +946,28 @@ const OnlineOrders: React.FC = () => {
                               >
                                 <Input
                                   type="number"
-                                  placeholder="e.g. 29999"
+                                  // placeholder="e.g. 29999"
                                   style={{ borderRadius: 6 }}
                                 />
                               </Form.Item>
                             </Col>
-                            <Col span={6}>
+                            <Col span={5}>
                               <Form.Item
                                 {...restField}
                                 name={[name, "quantity"]}
                                 label="Qty"
                                 rules={[
-                                  { required: true, message: "Enter qty" },
+                                  { required: true, message: "Enter quantity" },
                                 ]}
                               >
                                 <Input
-                                  type="number"
-                                  placeholder="e.g. 2"
+                                  // type="number"
+                                  // placeholder="e.g. 2"
                                   style={{ borderRadius: 6 }}
                                 />
                               </Form.Item>
                             </Col>
-                            <Col span={6}>
+                            <Col span={5}>
                               <Form.Item
                                 {...restField}
                                 name={[name, "total"]}
@@ -905,7 +986,7 @@ const OnlineOrders: React.FC = () => {
                                 danger
                                 icon={<DeleteOutlined />}
                                 onClick={() => remove(name)}
-                                style={{ marginTop: 30 }}
+                                style={{ marginTop: 5 }}
                               />
                             </Col>
                           </Row>
@@ -935,46 +1016,78 @@ const OnlineOrders: React.FC = () => {
           </Form.List>
 
           {/* Courier & Tracking */}
-          <Row gutter={16}>
-            <Col span={12}>
+          <Row gutter={14}>
+            <Col span={8}>
               <Form.Item
                 label="Courier"
                 name="courier"
-                rules={[{ required: true, message: "Enter courier name" }]}
+                // rules={[{ required: true, message: "Enter courier name" }]}
               >
                 <Input
-                  placeholder="e.g. Blue Dart"
+                  // placeholder="e.g. Blue Dart"
                   style={{ borderRadius: 8, height: 40 }}
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 label="Tracking Number"
                 name="trackingNumber"
-                rules={[{ required: true, message: "Enter tracking no." }]}
+                // rules={[{ required: true, message: "Enter tracking no." }]}
               >
                 <Input
-                  placeholder="e.g. TRK12345"
+                  // placeholder="e.g. TRK12345"
+                  style={{ borderRadius: 8, height: 40 }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                label="Weight"
+                name="weight"
+                // rules={[{ required: true, message: "Enter weight" }]}
+              >
+                <Input
+                  // placeholder="e.g. 2kg"
                   style={{ borderRadius: 8, height: 40 }}
                 />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
-                label="Order Date"
-                name="orderDate"
-                rules={[{ required: true, message: "Select order date" }]}
+                label={<span style={{ fontWeight: "500" }}>Order Source</span>}
+                name="orderSource"
+                rules={
+                  [
+                    // { required: true, message: "Please select order source" },
+                  ]
+                }
+              >
+                <Select
+                  // placeholder="Choose Source"
+                  options={[
+                    { label: "🌐 Website", value: "Website" },
+                    { label: "💬 WhatsApp", value: "WhatsApp" },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="date"
+                label="Date"
+                rules={[{ required: true, message: "Please select a date" }]}
               >
                 <DatePicker
-                  placeholder="e.g. YYYY-MM-DD"
+                  defaultValue={dayjs()}
+                  format="DD-MM-YYYY"
                   style={{ width: "100%", borderRadius: 8, height: 40 }}
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
               {/* Total Amount */}
               <Form.Item label="Total Amount" name="totalAmount">
                 <Input
@@ -986,25 +1099,6 @@ const OnlineOrders: React.FC = () => {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label={<span style={{ fontWeight: "500" }}>Order Source</span>}
-                name="orderSource"
-                rules={[
-                  { required: true, message: "Please select order source" },
-                ]}
-              >
-                <Select
-                  placeholder="Choose Source"
-                  options={[
-                    { label: "🌐 Website", value: "Website" },
-                    { label: "💬 WhatsApp", value: "WhatsApp" },
-                    { label: "📱 Mobile App", value: "App" },
-                    { label: "✍️ Manual", value: "Manual" },
-                  ]}
-                />
-              </Form.Item>
-            </Col>
             {/* <Col span={12}>
               <Form.Item label="Total Amount" name="totalAmount">
                 <Input
@@ -1024,6 +1118,8 @@ const OnlineOrders: React.FC = () => {
               block
               style={{
                 height: 45,
+                width: "40%",
+                alignItems: "center",
                 fontWeight: 600,
                 borderRadius: 8,
                 background: "#4b6cb7",
@@ -1053,21 +1149,33 @@ const OnlineOrders: React.FC = () => {
             type="primary"
             danger
             onClick={async () => {
-              if (selectedOrder) {
-                await handleDelete(selectedOrder._id);
+              if (selectedRows.length > 0) {
+                // Delete all selected orders
+                for (const order of selectedRows) {
+                  await handleDelete(order._id);
+                }
+                setSelectedRows([]); // clear selection after deletion
               }
               setDeleteModalVisible(false);
-              setSelectedOrder(null);
             }}
           >
-            Yes, Delete
+            Yes, Delete Selected
           </Button>,
         ]}
       >
-        <p>
-          Are you sure you want to delete order of{" "}
-          <b>{selectedOrder?.customerName}</b>?
-        </p>
+        {selectedRows.length === 1 ? (
+          <p>
+            Are you sure you want to delete order of{" "}
+            <b>{selectedRows[0].customerName}</b>?
+          </p>
+        ) : selectedRows.length > 1 ? (
+          <p>
+            Are you sure you want to delete <b>{selectedRows.length}</b>{" "}
+            selected orders?
+          </p>
+        ) : (
+          <p>No orders selected to delete.</p>
+        )}
       </Modal>
     </div>
   );
