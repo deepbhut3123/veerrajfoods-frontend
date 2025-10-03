@@ -32,7 +32,6 @@ import {
 
 const { Title } = Typography;
 const { Panel } = Collapse;
-const { confirm } = Modal;
 
 const DealerManagement: React.FC = () => {
   const [form] = Form.useForm();
@@ -68,6 +67,7 @@ const DealerManagement: React.FC = () => {
   const showModal = () => setIsModalOpen(true);
   const handleCancel = () => {
     setIsModalOpen(false);
+    setSelectedDealer(null);
     form.resetFields();
   };
 
@@ -75,10 +75,10 @@ const DealerManagement: React.FC = () => {
     try {
       setLoading(true);
       await deleteDealer(saleId);
-      message.success("Sale deleted successfully!");
+      message.success("Dealer deleted successfully!");
       fetchDealers(); // Refresh table
     } catch (err) {
-      message.error("Failed to delete sale");
+      message.error("Failed to delete dealer");
       console.error(err);
     } finally {
       setLoading(false);
@@ -137,24 +137,25 @@ const DealerManagement: React.FC = () => {
   };
 
   // 🔹 Submit form to update dealer
-  const handleUpdate = async () => {
-    try {
-      setLoading(true);
-      const values = await form.validateFields();
-      if (!selectedDealer) return;
+  const handleUpdate = async (values: any) => {
+  try {
+    setLoading(true);
+    if (!selectedDealer) return;
 
-      await updateDealer(selectedDealer._id, values);
+    await updateDealer(selectedDealer._id, values);
 
-      message.success("Dealer updated successfully!");
-      setIsModalOpen(false);
-      form.resetFields();
-      fetchDealers();
-    } catch (error: any) {
-      message.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    message.success("Dealer updated successfully!");
+    setIsModalOpen(false);
+    setSelectedDealer(null); // ✅ reset after update
+    form.resetFields();
+    fetchDealers();
+  } catch (error: any) {
+    message.error(error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const filteredDealers = dealers.filter((dealer) =>
     dealer.dealerName?.toLowerCase().includes(searchText.toLowerCase())
@@ -253,7 +254,6 @@ const DealerManagement: React.FC = () => {
                         gap: 10, // space between buttons
                       }}
                     >
-                      
                       <Tooltip title="Edit">
                         <div
                           onClick={(e) => {
@@ -396,7 +396,7 @@ const DealerManagement: React.FC = () => {
         <Form
           layout="vertical"
           form={form}
-          onFinish={handleAddDealer}
+          onFinish={selectedDealer ? handleUpdate : handleAddDealer} // ✅ check mode
           style={{ gap: "24px", display: "flex", flexDirection: "column" }}
         >
           {/* Dealer Name */}
@@ -444,7 +444,7 @@ const DealerManagement: React.FC = () => {
                             background: "#fff",
                             border: "1px solid #e4eaf3",
                             borderRadius: 12,
-                            padding: "16px",
+                            // padding: "10px",
                             boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
                           }}
                         >
@@ -493,7 +493,7 @@ const DealerManagement: React.FC = () => {
                                 icon={<DeleteOutlined />}
                                 onClick={() => remove(name)}
                                 style={{
-                                  marginTop: 30,
+                                  marginTop: 10,
                                 }}
                               />
                             </Col>

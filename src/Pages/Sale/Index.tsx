@@ -20,6 +20,7 @@ import {
   ExclamationCircleOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
+  FileImageOutlined,
 } from "@ant-design/icons";
 import {
   addSales,
@@ -32,6 +33,8 @@ import {
 import { PlusCircleOutlined } from "@ant-design/icons";
 import moment from "moment";
 import { motion, AnimatePresence } from "framer-motion";
+import html2canvas from "html2canvas";
+import dayjs from "dayjs";
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -50,6 +53,77 @@ const SalesPage: React.FC = () => {
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedSale, setSelectedSale] = useState<any>(null);
+
+  const showToast = (
+    text: string,
+    type: "success" | "error" | "warning" = "success"
+  ) => {
+    const toast = document.createElement("div");
+
+    // Set icon based on type
+    let icon = "✅";
+    if (type === "error") icon = "❌";
+    else if (type === "warning") icon = "⚠️";
+
+    toast.innerHTML = `
+    <span style="margin-right:8px;">${icon}</span>
+    <span>${text}</span>
+  `;
+
+    // Style
+    toast.style.position = "fixed";
+    toast.style.top = "20px";
+    toast.style.right = "20px";
+    toast.style.padding = "12px 20px";
+    toast.style.background =
+      type === "success"
+        ? "linear-gradient(135deg, #43e97b, #38f9d7)"
+        : type === "error"
+        ? "linear-gradient(135deg, #ff4e50, #f9d423)"
+        : "linear-gradient(135deg, #fbc2eb, #a6c1ee)"; // warning
+    toast.style.color = "#fff";
+    toast.style.fontWeight = "500";
+    toast.style.fontSize = "14px";
+    toast.style.borderRadius = "12px";
+    toast.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+    toast.style.zIndex = "9999";
+    toast.style.display = "flex";
+    toast.style.alignItems = "center";
+    toast.style.marginTop = "8px";
+    toast.style.transition = "transform 0.3s ease, opacity 0.3s ease";
+    toast.style.transform = "translateX(120%)";
+    toast.style.opacity = "0";
+
+    // Create a container for multiple toasts
+    let container = document.getElementById("custom-toast-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "custom-toast-container";
+      container.style.position = "fixed";
+      container.style.top = "20px";
+      container.style.right = "20px";
+      container.style.zIndex = "9999";
+      container.style.display = "flex";
+      container.style.flexDirection = "column";
+      container.style.gap = "8px";
+      document.body.appendChild(container);
+    }
+
+    container.appendChild(toast);
+
+    // Animate in
+    requestAnimationFrame(() => {
+      toast.style.transform = "translateX(0)";
+      toast.style.opacity = "1";
+    });
+
+    // Animate out and remove after 2 seconds
+    setTimeout(() => {
+      toast.style.transform = "translateX(120%)";
+      toast.style.opacity = "0";
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  };
 
   const toggleExpand = (key: string) => {
     setExpandedRowKeys((prev) =>
@@ -182,6 +256,70 @@ const SalesPage: React.FC = () => {
     );
   });
 
+  const generateBillImage = async (sale: any) => {
+    if (!sale) {
+      showToast("Please select a sale to generate image", "warning");
+      return;
+    }
+
+    setSelectedSale(sale); // set the selected sale
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const billElement = document.getElementById("bill-to-capture");
+    if (!billElement) return;
+
+    try {
+      const canvas = await html2canvas(billElement, { scale: 2 });
+      const dataURL = canvas.toDataURL("image/png");
+
+      const blob = await (await fetch(dataURL)).blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob }),
+      ]);
+
+      showToast("Bill image copied to clipboard!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to generate image", "error");
+    }
+  };
+
+  const generateTopBillImage = async () => {
+    if (!selectedRows || selectedRows.length === 0) {
+      showToast(
+        "Please select at least one sale to generate bill image",
+        "warning"
+      );
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const billElement = document.getElementById("bill-to-capture-top");
+    if (!billElement) return;
+
+    try {
+      const canvas = await html2canvas(billElement, { scale: 2 });
+      const dataURL = canvas.toDataURL("image/png");
+
+      const blob = await (await fetch(dataURL)).blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob }),
+      ]);
+
+      showToast("Selected bill(s) copied to clipboard!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to generate bill image", "error");
+    }
+  };
+
+  const selectedTotalAmount = selectedRows.reduce(
+    (acc, sale) => acc + (sale.totalAmount || 0),
+    0
+  );
+
   const productColumns = [
     {
       title: "Product Name",
@@ -240,9 +378,11 @@ const SalesPage: React.FC = () => {
       dataIndex: "totalAmount",
       sorter: (a: any, b: any) => (a.totalAmount || 0) - (b.totalAmount || 0),
       render: (amount: number | undefined) => {
-        // Handle undefined/null and provide default value
         const safeAmount = amount || 0;
-        return `₹ ${safeAmount.toLocaleString()}`;
+        return `₹ ${safeAmount.toLocaleString("en-IN", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        })}`;
       },
     },
     {
@@ -280,6 +420,32 @@ const SalesPage: React.FC = () => {
               }}
             />
           </Tooltip>
+          {/* Generate Bill Image Button */}
+          <Tooltip title="Generate Bill Image">
+            <Button
+              type="primary"
+              icon={<FileImageOutlined />}
+              onClick={() => {
+                setSelectedSale(record); // set the sale for bill capture
+                generateBillImage(record);
+              }}
+              style={{
+                cursor: "pointer",
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "linear-gradient(135deg, #4b6cb7, #182848)",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                transition: "all 0.3s",
+                border: "none",
+                outline: "none",
+              }}
+            ></Button>
+          </Tooltip>
+
           <Tooltip title="Delete">
             <Button
               style={{
@@ -347,6 +513,33 @@ const SalesPage: React.FC = () => {
             }}
           >
             Add Bill
+          </Button>
+
+          <Button
+            type="default"
+            onClick={generateTopBillImage}
+            disabled={selectedRows.length === 0}
+            style={{
+              background:
+                selectedRows.length === 0
+                  ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
+                  : "linear-gradient(135deg, #ff9800 0%, #ffc107 100%)",
+              border: "none",
+              color: selectedRows.length === 0 ? "#888" : "#fff",
+              borderRadius: "8px",
+              padding: "6px 16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              boxShadow:
+                selectedRows.length === 0
+                  ? "none"
+                  : "0 3px 6px rgba(0,0,0,0.1)",
+              cursor: selectedRows.length === 0 ? "not-allowed" : "pointer",
+            }}
+          >
+            Generate Statement
           </Button>
 
           {/* Export Excel Button */}
@@ -602,92 +795,184 @@ const SalesPage: React.FC = () => {
 
               return (
                 <AnimatePresence initial={false}>
-                  <div style={{ display: "grid", gap: "6px" }}>
-                    {sale?.products?.map((p: any, i: number) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.3, ease: "easeInOut" }}
-                        style={{ overflow: "hidden" }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            background: "#fafafa",
-                            border: "1px solid #f0f0f0",
-                            borderRadius: "8px",
-                            padding: "6px 12px",
-                            maxWidth: "600px", // ✅ reduce row width
-                          }}
-                        >
-                          {/* Product Name */}
-                          <span
-                            style={{
-                              fontWeight: 600,
-                              fontSize: "14px",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {p.productName}
-                          </span>
-
-                          {/* Info badges */}
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "6px",
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <span
-                              style={{
-                                background: "#e6f4ff",
-                                color: "#1677ff",
-                                borderRadius: "4px",
-                                padding: "2px 8px",
-                                fontSize: "12px",
-                              }}
-                            >
-                              ₹{p.productPrice}
-                            </span>
-                            <span
-                              style={{
-                                background: "#f6ffed",
-                                color: "#389e0d",
-                                borderRadius: "4px",
-                                padding: "2px 8px",
-                                fontSize: "12px",
-                              }}
-                            >
-                              Qty: {p.quantity}
-                            </span>
-                            <span
-                              style={{
-                                background: "#f9f0ff",
-                                color: "#722ed1",
-                                borderRadius: "4px",
-                                padding: "2px 8px",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                              }}
-                            >
-                              ₹{p.total}
-                            </span>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    {/* ✅ Only one nested table here */}
+                    <Table
+                      dataSource={sale?.products || []}
+                      pagination={false}
+                      size="small"
+                      rowKey={(_item: any, index?: number) =>
+                        index !== undefined ? index.toString() : ""
+                      }
+                      columns={[
+                        {
+                          title: "Product",
+                          dataIndex: "productName",
+                          key: "productName",
+                        },
+                        {
+                          title: "Quantity",
+                          dataIndex: "quantity",
+                          key: "quantity",
+                        },
+                        {
+                          title: "Price (₹)",
+                          dataIndex: "productPrice",
+                          key: "productPrice",
+                          render: (price: number) =>
+                            `₹ ${Math.floor(price).toLocaleString("en-IN")}`,
+                        },
+                        {
+                          title: "Total (₹)",
+                          dataIndex: "total",
+                          key: "total",
+                          render: (total: number) =>
+                            `₹ ${Math.floor(total).toLocaleString("en-IN")}`,
+                        },
+                      ]}
+                      style={{
+                        fontSize: 12, // 🔹 smaller text
+                        maxWidth: "800px",
+                      }}
+                      className="compact-table"
+                    />
+                  </motion.div>
                 </AnimatePresence>
               );
             },
           }}
         />
       </Card>
+      <div
+        id="bill-to-capture"
+        style={{
+          position: "absolute",
+          top: "-9999px",
+          left: "-9999px",
+          width: "400px",
+          padding: "16px",
+          backgroundColor: "#fff",
+          fontFamily: "'Inter', sans-serif",
+        }}
+      >
+        <h3 style={{ margin: 0, marginBottom: 8 }}>Bill</h3>
+        <p style={{ marginBottom: 8 }}>
+          Date: {dayjs(selectedSale?.date).format("DD-MM-YYYY")}
+        </p>
+
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={{ border: "1px solid #ccc", padding: "4px" }}>
+                Product
+              </th>
+              <th style={{ border: "1px solid #ccc", padding: "4px" }}>Qty</th>
+              <th style={{ border: "1px solid #ccc", padding: "4px" }}>
+                Price
+              </th>
+              <th style={{ border: "1px solid #ccc", padding: "4px" }}>
+                Total
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {selectedSale?.products?.map((p: any, index: number) => (
+              <tr key={index}>
+                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
+                  {p.productName}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
+                  {p.quantity}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
+                  ₹ {Math.floor(p.productPrice)}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
+                  ₹ {Math.floor(p.total)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p style={{ textAlign: "right", marginTop: 8, fontWeight: 600 }}>
+          Total: ₹ {Math.floor(selectedSale?.totalAmount)}
+        </p>
+      </div>
+      <div
+        id="bill-to-capture-top"
+        style={{
+          position: "absolute",
+          top: "-9999px",
+          left: "-9999px",
+          padding: "16px",
+          backgroundColor: "#fff",
+          fontFamily: "'Inter', sans-serif",
+        }}
+      >
+        <h3 style={{ margin: 0, marginBottom: 8 }}>Bill</h3>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            textAlign: "center", // horizontal center
+            verticalAlign: "middle",
+          }}
+        >
+          <thead>
+            <tr>
+              <th style={{ border: "1px solid #ccc", padding: "4px" }}>#</th>
+              <th style={{ border: "1px solid #ccc", padding: "4px" }}>Date</th>
+              <th style={{ border: "1px solid #ccc", padding: "4px" }}>
+                Total (₹)
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {selectedRows.map((sale, index) => (
+              <tr key={sale.key}>
+                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
+                  {index + 1}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
+                  {dayjs(sale.date).format("DD-MM-YYYY")}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
+                  ₹ {Math.floor(sale.totalAmount)}
+                </td>
+              </tr>
+            ))}
+            <tr>
+              <td
+                colSpan={2}
+                style={{
+                  border: "1px solid #ccc",
+                  padding: "4px",
+                  textAlign: "right",
+                  fontWeight: 600,
+                }}
+              >
+                Grand Total
+              </td>
+              <td
+                style={{
+                  border: "1px solid #ccc",
+                  padding: "4px",
+                  fontWeight: 600,
+                }}
+              >
+                ₹ {Math.floor(selectedTotalAmount)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

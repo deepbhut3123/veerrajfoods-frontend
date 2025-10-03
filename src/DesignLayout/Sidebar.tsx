@@ -54,6 +54,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       link: "/dashboard",
     },
     {
+      key: "online-order",
+      icon: <ShoppingCartOutlined style={{ color: "inherit" }} />,
+      text: "Online Order",
+      link: "/online-order",
+    },
+    {
       key: "dealers",
       icon: <ShopOutlined style={{ color: "inherit" }} />,
       text: "Dealers",
@@ -64,12 +70,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: <FileTextOutlined style={{ color: "inherit" }} />,
       text: "Sales",
       link: "/sales",
-    },
-    {
-      key: "online-order",
-      icon: <ShoppingCartOutlined style={{ color: "inherit" }} />,
-      text: "Online Order",
-      link: "/online-order",
     },
   ];
 

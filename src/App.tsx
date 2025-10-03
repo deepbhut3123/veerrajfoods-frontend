@@ -10,6 +10,7 @@ import { AuthProvider } from './Auth/AuthContext';
 import Register from './Auth/Register';
 import PrivateRoute from './Auth/privateRoute';
 import Dashboard from './DesignLayout/Dashboard';
+import "antd/dist/reset.css"; // for AntD v5+
 // import Notifications from './Pages/Notification';
 // import { SettingsProvider } from './Pages/Settings/SettingContext';
 

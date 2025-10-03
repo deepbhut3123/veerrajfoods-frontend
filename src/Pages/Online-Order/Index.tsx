@@ -34,9 +34,9 @@ import {
   ExclamationCircleOutlined,
   EditOutlined,
   PrinterOutlined,
-  CopyOutlined,
   ExportOutlined,
   TruckOutlined,
+  PhoneOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -486,7 +486,9 @@ Thank you for shopping with us! 😊
 
                   navigator.clipboard
                     .writeText(msg)
-                    .then(() => showToast("Customer tracking message copied!", "success"))
+                    .then(() =>
+                      showToast("Customer tracking message copied!", "success")
+                    )
                     .catch(() =>
                       showToast("Failed to copy tracking number", "error")
                     );
@@ -507,11 +509,11 @@ Thank you for shopping with us! 😊
                 <TruckOutlined style={{ fontSize: 16, color: "#fff" }} />
               </div>
             </Tooltip>
-            <Tooltip title="Copy Customer Detail">
+            {/* <Tooltip title="Copy Customer Detail">
               <div
                 onClick={() => {
-                  const msg = `Customer Name:- ${record.customerName}
-                  Contact Number:- ${record.phoneNo}`
+                  const msg = `${record.customerName}
+${record.phoneNo}`
 
                   navigator.clipboard
                     .writeText(msg)
@@ -533,9 +535,9 @@ Thank you for shopping with us! 😊
                   transition: "all 0.3s",
                 }}
               >
-                <CopyOutlined style={{ fontSize: 16, color: "#fff" }} />
+                <PhoneOutlined style={{ fontSize: 16, color: "#fff" }} />
               </div>
-            </Tooltip>
+            </Tooltip> */}
             <Tooltip title="Edit">
               <div
                 onClick={() => handleEdit(record._id)}
@@ -627,76 +629,76 @@ Thank you for shopping with us! 😊
         <Col>
           <Space wrap={false}>
             <Tooltip title="Add Details">
-            <Button
-              type="primary"
-              icon={<PlusCircleOutlined size={18} />}
-              onClick={() => setIsModalOpen(true)}
-              style={{
-                background: "#4b6cb7",
-                borderColor: "#4b6cb7",
-                padding: "6px 16px",
-                borderRadius: "8px",
-              }}
-            ></Button>
+              <Button
+                type="primary"
+                icon={<PlusCircleOutlined size={18} />}
+                onClick={() => setIsModalOpen(true)}
+                style={{
+                  background: "#4b6cb7",
+                  borderColor: "#4b6cb7",
+                  padding: "6px 16px",
+                  borderRadius: "8px",
+                }}
+              ></Button>
             </Tooltip>
 
-              <Tooltip title="Export Excel">
-            <Button
-              type="default"
-              icon={<ExportOutlined size={18} />}
-              onClick={handleExportExcel}
-              disabled={selectedRows.length === 0}
-              style={{
-                background:
-                  selectedRows.length === 0
-                    ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
-                    : "linear-gradient(135deg, #28a745 0%, #85d96b 100%)",
-                border: "none",
-                color: selectedRows.length === 0 ? "#888" : "#fff",
-                borderRadius: "8px",
-                padding: "6px 16px",
-              }}
-            ></Button>
+            <Tooltip title="Export Excel">
+              <Button
+                type="default"
+                icon={<ExportOutlined size={18} />}
+                onClick={handleExportExcel}
+                disabled={selectedRows.length === 0}
+                style={{
+                  background:
+                    selectedRows.length === 0
+                      ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
+                      : "linear-gradient(135deg, #28a745 0%, #85d96b 100%)",
+                  border: "none",
+                  color: selectedRows.length === 0 ? "#888" : "#fff",
+                  borderRadius: "8px",
+                  padding: "6px 16px",
+                }}
+              ></Button>
             </Tooltip>
 
             <Tooltip title="Print">
-            <Button
-              type="default"
-              onClick={handlePrintSelected}
-              disabled={selectedRows.length === 0}
-              style={{
-                background:
-                  selectedRows.length === 0
-                    ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
-                    : "linear-gradient(135deg, #0072ff 0%, #00c6ff 100%)",
-                border: "none",
-                color: selectedRows.length === 0 ? "#888" : "#fff",
-                borderRadius: "8px",
-                padding: "6px 16px",
-              }}
-            >
-              <PrinterOutlined style={{ fontSize: 16 }} />
-            </Button>
-</Tooltip>
-<Tooltip title="Delete">
-            <Button
-              type="default"
-              danger
-              onClick={() => setDeleteModalVisible(true)}
-              disabled={selectedRows.length === 0}
-              style={{
-                background:
-                  selectedRows.length === 0
-                    ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
-                    : "linear-gradient(135deg, #ff4e50 0%, #f9d423 100%)",
-                border: "none",
-                color: selectedRows.length === 0 ? "#888" : "#fff",
-                borderRadius: "8px",
-                padding: "6px 16px",
-              }}
-            >
-              <DeleteOutlined style={{ fontSize: 16 }} />
-            </Button>
+              <Button
+                type="default"
+                onClick={handlePrintSelected}
+                disabled={selectedRows.length === 0}
+                style={{
+                  background:
+                    selectedRows.length === 0
+                      ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
+                      : "linear-gradient(135deg, #0072ff 0%, #00c6ff 100%)",
+                  border: "none",
+                  color: selectedRows.length === 0 ? "#888" : "#fff",
+                  borderRadius: "8px",
+                  padding: "6px 16px",
+                }}
+              >
+                <PrinterOutlined style={{ fontSize: 16 }} />
+              </Button>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <Button
+                type="default"
+                danger
+                onClick={() => setDeleteModalVisible(true)}
+                disabled={selectedRows.length === 0}
+                style={{
+                  background:
+                    selectedRows.length === 0
+                      ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
+                      : "linear-gradient(135deg, #ff4e50 0%, #f9d423 100%)",
+                  border: "none",
+                  color: selectedRows.length === 0 ? "#888" : "#fff",
+                  borderRadius: "8px",
+                  padding: "6px 16px",
+                }}
+              >
+                <DeleteOutlined style={{ fontSize: 16 }} />
+              </Button>
             </Tooltip>
           </Space>
         </Col>
@@ -805,6 +807,12 @@ Thank you for shopping with us! 😊
                     >
                       Tracking: {record.trackingNumber || "N/A"}
                     </Tag>
+                    <Tag
+                      color="geekblue"
+                      style={{ fontSize: 12, padding: "2px 6px" }}
+                    >
+                      Weight: {record.weight || "N/A"}
+                    </Tag>
                   </div>
                 </motion.div>
               )}
@@ -836,6 +844,9 @@ Thank you for shopping with us! 😊
           onFinish={handleSubmit} // ✅ unified submit
           onValuesChange={updateTotals}
           style={{ display: "flex", flexDirection: "column" }}
+          initialValues={{
+            orderDate: dayjs(), // set today's date as initial value
+          }}
         >
           {/* Customer Info */}
           <Row gutter={14}>
@@ -1076,7 +1087,7 @@ Thank you for shopping with us! 😊
             </Col>
             <Col span={8}>
               <Form.Item
-                name="date"
+                name="orderDate"
                 label="Date"
                 rules={[{ required: true, message: "Please select a date" }]}
               >
