@@ -200,3 +200,106 @@ export const exportToexcelOnline = async (payload: any = {}) => {
     throw error;
   }
 };
+
+export const addPaymentDetail = async (payload: any) => {
+  try {
+    const response = await API.post("/backend/payment", payload); // send as JSON
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getPaymentDetail = async (params: any = {}) => {
+  try {
+    const response = await API.get("/backend/payment", { params });
+    return response.data; // assumed structure
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getSinglepaymentDetail = async (id: string) => {
+  try {
+    const response = await API.get(`/backend/payment/${id}`);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to fetch payment");
+  }
+};
+
+// ✅ Update order by ID
+export const updatePaymentDetail = async (id: string, orderData: any) => {
+  try {
+    const response = await API.put(`backend/payment/${id}/edit`, orderData);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to update payment");
+  }
+};
+
+export const deletePaymentDetail = async (id: string) => {
+  try {
+    const response = await API.delete(`/backend/payment/${id}/delete`);
+    return response;
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+export const exportToexcelPayment = async (payload: any = {}) => {
+  try {
+    const response = await API.post("/backend/payment/export", payload, {
+      responseType: "blob", // important for Excel
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const addExpense = async (payload: any) => {
+  try {
+    const response = await API.post("/backend/expense", payload); // send as JSON
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getExpense = async (params: any = {}) => {
+  try {
+    const response = await API.get("/backend/expense", { params });
+    return response.data; // assumed structure
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getSingleExpense = async (id: string) => {
+  try {
+    const response = await API.get(`/backend/expense/${id}`);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to fetch expense");
+  }
+};
+
+// ✅ Update order by ID
+export const updateExpense = async (id: string, orderData: any) => {
+  try {
+    const response = await API.put(`backend/espense/${id}/edit`, orderData);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to update expense");
+  }
+};
+
+export const deleteExpense = async (id: string) => {
+  try {
+    const response = await API.delete(`/backend/expense/${id}/delete`);
+    return response;
+  } catch (error) {
+    console.error(error);
+  }
+};

@@ -2,10 +2,12 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import { Drawer, Layout, Menu } from "antd";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
+  CreditCardOutlined,
   DashboardOutlined,
   FileTextOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
+  ShoppingOutlined,
   SolutionOutlined,
 } from "@ant-design/icons";
 // import { AuthContext } from "../Auth/AuthContext";
@@ -70,6 +72,18 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: <FileTextOutlined style={{ color: "inherit" }} />,
       text: "Sales",
       link: "/sales",
+    },
+    {
+      key: "payments",
+      icon: <CreditCardOutlined style={{ color: "inherit" }} />,
+      text: "Payments",
+      link: "/payments",
+    },
+    {
+      key: "expenses",
+      icon: <ShoppingOutlined style={{ color: "inherit" }} />,
+      text: "Expenses",
+      link: "/expenses",
     },
   ];
 
