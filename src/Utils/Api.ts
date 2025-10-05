@@ -286,9 +286,9 @@ export const getSingleExpense = async (id: string) => {
 };
 
 // ✅ Update order by ID
-export const updateExpense = async (id: string, orderData: any) => {
+export const updateExpense = async (id: string, expenseData: any) => {
   try {
-    const response = await API.put(`backend/espense/${id}/edit`, orderData);
+    const response = await API.put(`backend/expense/${id}/edit`, expenseData);
     return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Failed to update expense");
