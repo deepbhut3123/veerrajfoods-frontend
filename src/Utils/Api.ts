@@ -124,6 +124,25 @@ export const getAllSales = async () => {
   }
 };
 
+export const getSingleSales = async (id: string) => {
+  try {
+    const response = await API.get(`/backend/sales/${id}`);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to fetch sales");
+  }
+};
+
+// ✅ Update order by ID
+export const updateSales = async (id: string, salesData: any) => {
+  try {
+    const response = await API.put(`backend/sales/${id}/edit`, salesData);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to update sales");
+  }
+};
+
 export const deleteSales = async (id: string) => {
   try {
     const response = await API.delete(`/backend/sales/${id}/delete`);

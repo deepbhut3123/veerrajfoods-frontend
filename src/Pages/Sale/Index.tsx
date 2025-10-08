@@ -17,9 +17,12 @@ import {
 } from "antd";
 import {
   DeleteOutlined,
+  EditOutlined,
   ExclamationCircleOutlined,
+  ExportOutlined,
   EyeInvisibleOutlined,
   EyeOutlined,
+  FileDoneOutlined,
   FileImageOutlined,
 } from "@ant-design/icons";
 import {
@@ -28,6 +31,8 @@ import {
   exportToexcelSales,
   getAllDealer,
   getAllSales,
+  getSingleSales,
+  updateSales,
 } from "../../Utils/Api"; // your API
 // import moment from "moment";
 import { PlusCircleOutlined } from "@ant-design/icons";
@@ -53,6 +58,8 @@ const SalesPage: React.FC = () => {
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
 
   const showToast = (
     text: string,
@@ -131,13 +138,45 @@ const SalesPage: React.FC = () => {
     );
   };
 
-  const openModal = async () => {
-    setVisible(true);
+  const openModal = async (saleId?: string) => {
     try {
       const res = await getAllDealer();
       setDealers(res);
+
+      if (saleId) {
+        // Edit mode
+        setEditMode(true);
+        setEditingSaleId(saleId);
+
+        const sale = await getSingleSales(saleId);
+
+        // Pre-fill form
+        form.setFieldsValue({
+          date: moment(sale.date),
+          dealerId: sale.dealer._id,
+        });
+
+        setSelectedDealer(sale.dealer);
+
+        const initialProducts = (sale.products || []).map((p: any) => ({
+          ...p,
+          total: p.productPrice * p.quantity,
+        }));
+
+        setProducts(initialProducts);
+        calculateTotal(initialProducts);
+      } else {
+        // Add mode
+        setEditMode(false);
+        setEditingSaleId(null);
+        form.resetFields();
+        setProducts([]);
+        setTotalAmount(0);
+      }
+
+      setVisible(true);
     } catch (err) {
-      message.error("Failed to fetch dealers");
+      message.error("Failed to fetch data");
     }
   };
 
@@ -207,6 +246,7 @@ const SalesPage: React.FC = () => {
   const handleSubmit = async (values: any) => {
     try {
       setLoading(true);
+
       const payload = {
         date: values.date.format("YYYY-MM-DD"),
         dealerId: values.dealerId,
@@ -221,26 +261,23 @@ const SalesPage: React.FC = () => {
         totalAmount,
       };
 
-      const response = await addSales(payload);
+      if (editMode && editingSaleId) {
+        await updateSales(editingSaleId, payload);
+        message.success("Sale updated successfully!");
+      } else {
+        await addSales(payload);
+        message.success("Sale created successfully!");
+      }
 
-      // Refresh sales data after successful creation
-      const salesResponse = await getAllSales();
-      setSalesData(
-        salesResponse.map((sale: any) => ({
-          key: sale._id,
-          date: moment(sale.date).format("YYYY-MM-DD"),
-          dealerName: sale.dealer?.dealerName || "Unknown",
-          totalAmount: sale.totalAmount,
-        }))
-      );
-
-      message.success("Sale created successfully!");
+      fetchSales(); // Refresh table
       setVisible(false);
       form.resetFields();
       setProducts([]);
       setTotalAmount(0);
     } catch (err) {
-      message.error("Failed to create sale");
+      message.error(
+        editMode ? "Failed to update sale" : "Failed to create sale"
+      );
       console.error(err);
     } finally {
       setLoading(false);
@@ -445,9 +482,11 @@ const SalesPage: React.FC = () => {
               }}
             ></Button>
           </Tooltip>
-
-          <Tooltip title="Delete">
+          <Tooltip title="Edit">
             <Button
+              shape="circle"
+              icon={<EditOutlined style={{ color: "#fff", fontSize: 16 }} />}
+              onClick={() => openModal(record.key)}
               style={{
                 cursor: "pointer",
                 width: 30,
@@ -456,19 +495,11 @@ const SalesPage: React.FC = () => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "linear-gradient(135deg, #ff4e50, #f9d423)",
+                background: "linear-gradient(135deg, #36d1dc, #5b86e5)",
                 boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-                transition: "all 0.3s",
                 border: "none",
-                outline: "none",
               }}
-              onClick={() => {
-                setSelectedSale(record); // store current sale
-                setDeleteModalVisible(true);
-              }}
-            >
-              <DeleteOutlined style={{ color: "#fff", fontSize: 16 }} />
-            </Button>
+            />
           </Tooltip>
         </Space>
       ),
@@ -500,99 +531,112 @@ const SalesPage: React.FC = () => {
               alignItems: "end",
             }}
           />
-
-          <Button
-            type="primary"
-            icon={<PlusCircleOutlined size={18} />}
-            onClick={openModal}
-            style={{
-              background: "#4b6cb7",
-              borderColor: "#4b6cb7",
-              padding: "6px 16px",
-              borderRadius: "8px",
-            }}
-          >
-            Add Bill
-          </Button>
-
-          <Button
-            type="default"
-            onClick={generateTopBillImage}
-            disabled={selectedRows.length === 0}
-            style={{
-              background:
-                selectedRows.length === 0
-                  ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
-                  : "linear-gradient(135deg, #ff9800 0%, #ffc107 100%)",
-              border: "none",
-              color: selectedRows.length === 0 ? "#888" : "#fff",
-              borderRadius: "8px",
-              padding: "6px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              boxShadow:
-                selectedRows.length === 0
-                  ? "none"
-                  : "0 3px 6px rgba(0,0,0,0.1)",
-              cursor: selectedRows.length === 0 ? "not-allowed" : "pointer",
-            }}
-          >
-            Generate Statement
-          </Button>
+          <Tooltip title="Add New Bill">
+            <Button
+              type="primary"
+              icon={<PlusCircleOutlined size={18} />}
+              onClick={() => openModal()}
+              style={{
+                background: "#4b6cb7",
+                borderColor: "#4b6cb7",
+                padding: "6px 16px",
+                borderRadius: "8px",
+              }}
+            ></Button>
+          </Tooltip>
 
           {/* Export Excel Button */}
-          <Button
-            type="default"
-            onClick={async () => {
-              try {
-                const dataToExport =
-                  selectedRows.length > 0 ? selectedRows : salesData; // ✅ check selection
-                const payload = { payload: dataToExport };
-                const blob = await exportToexcelSales(payload);
+          <Tooltip title="Export to Excel">
+            <Button
+              type="default"
+              icon={<ExportOutlined size={18} />}
+              onClick={async () => {
+                try {
+                  const dataToExport =
+                    selectedRows.length > 0 ? selectedRows : salesData; // ✅ check selection
+                  const payload = { payload: dataToExport };
+                  const blob = await exportToexcelSales(payload);
 
-                const url = window.URL.createObjectURL(new Blob([blob]));
-                const link = document.createElement("a");
-                link.href = url;
-                link.setAttribute("download", "Sales.xlsx");
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
+                  const url = window.URL.createObjectURL(new Blob([blob]));
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.setAttribute("download", "Sales.xlsx");
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
 
-                message.success(
-                  selectedRows.length > 0
-                    ? "Selected rows exported successfully!"
-                    : "All sales exported successfully!"
-                );
-              } catch (err) {
-                message.error("Failed to export Excel");
-                console.error(err);
-              }
-            }}
-            disabled={selectedRows.length === 0}
-            style={{
-              background:
-                selectedRows.length === 0
-                  ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)" // grey gradient for disabled
-                  : "linear-gradient(135deg, #28a745 0%, #85d96b 100%)", // green gradient
-              border: "none",
-              color: selectedRows.length === 0 ? "#888" : "#fff",
-              borderRadius: "8px",
-              padding: "6px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              boxShadow:
-                selectedRows.length === 0
-                  ? "none"
-                  : "0 3px 6px rgba(0,0,0,0.1)", // remove shadow when disabled
-              cursor: selectedRows.length === 0 ? "not-allowed" : "pointer", // show blocked cursor
-            }}
-          >
-            Export Excel
-          </Button>
+                  message.success(
+                    selectedRows.length > 0
+                      ? "Selected rows exported successfully!"
+                      : "All sales exported successfully!"
+                  );
+                } catch (err) {
+                  message.error("Failed to export Excel");
+                  console.error(err);
+                }
+              }}
+              disabled={selectedRows.length === 0}
+              style={{
+                background:
+                  selectedRows.length === 0
+                    ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)" // grey gradient for disabled
+                    : "linear-gradient(135deg, #28a745 0%, #85d96b 100%)", // green gradient
+                border: "none",
+                color: selectedRows.length === 0 ? "#888" : "#fff",
+                borderRadius: "8px",
+                padding: "6px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                boxShadow:
+                  selectedRows.length === 0
+                    ? "none"
+                    : "0 3px 6px rgba(0,0,0,0.1)", // remove shadow when disabled
+                cursor: selectedRows.length === 0 ? "not-allowed" : "pointer", // show blocked cursor
+              }}
+            ></Button>
+          </Tooltip>
+
+          <Tooltip title="Generate Statement">
+            <Button
+              type="default"
+              icon={<FileDoneOutlined size={18} />}
+              onClick={generateTopBillImage}
+              disabled={selectedRows.length === 0}
+              style={{
+                background:
+                  selectedRows.length === 0
+                    ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
+                    : "linear-gradient(135deg, #ff9800 0%, #ffc107 100%)",
+                border: "none",
+                color: selectedRows.length === 0 ? "#888" : "#fff",
+                borderRadius: "8px",
+                padding: "6px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                boxShadow:
+                  selectedRows.length === 0
+                    ? "none"
+                    : "0 3px 6px rgba(0,0,0,0.1)",
+                cursor: selectedRows.length === 0 ? "not-allowed" : "pointer",
+              }}
+            ></Button>
+          </Tooltip>
+
+          {/* Delete Button for Selected Rows */}
+          <Tooltip title="Delete Selected">
+            <Button
+              danger
+              type="primary"
+              disabled={selectedRows.length === 0}
+              onClick={() => setDeleteModalVisible(true)}
+            >
+              <DeleteOutlined style={{ fontSize: 16 }} />
+            </Button>
+          </Tooltip>
         </Space>
       </Row>
 
@@ -600,7 +644,7 @@ const SalesPage: React.FC = () => {
       <Modal
         title={
           <span style={{ fontSize: "20px", fontWeight: "bold" }}>
-            Add New Bill
+            {editMode ? "Edit Bill" : "Add New Bill"}
           </span>
         }
         open={visible}
@@ -612,7 +656,7 @@ const SalesPage: React.FC = () => {
         }}
         onOk={() => form.submit()}
         width={900}
-        okText={<span>Submit Bill</span>}
+        okText={<span>{editMode ? "Update Bill" : "Submit Bill"}</span>}
         cancelText="Cancel"
         confirmLoading={loading}
         bodyStyle={{ padding: "24px" }}
@@ -740,8 +784,17 @@ const SalesPage: React.FC = () => {
         </div>
 
         <div style={{ fontSize: 14, marginBottom: 20 }}>
-          Are you sure you want to delete order of{" "}
-          <b>{selectedSale?.dealer?.dealerName}</b>?
+          {selectedRows.length === 1 ? (
+            <>
+              Are you sure you want to delete order of{" "}
+              <b>{selectedRows[0]?.dealer?.dealerName}</b>?
+            </>
+          ) : (
+            <>
+              Are you sure you want to delete <b>{selectedRows.length}</b>{" "}
+              selected sales?
+            </>
+          )}
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -749,14 +802,20 @@ const SalesPage: React.FC = () => {
           <Button
             danger
             type="primary"
-            onClick={() => {
-              // console.log("Clicked delete", selectedSale);
-              if (selectedSale?.key) {
-                handleDeleteSale(selectedSale.key);
-              } else {
-                console.warn("No sale ID found!");
+            onClick={async () => {
+              try {
+                for (let sale of selectedRows) {
+                  if (sale.key) {
+                    await handleDeleteSale(sale.key);
+                  }
+                }
+                message.success("Selected sales deleted");
+                fetchSales();
+              } catch (err) {
+                message.error("Failed to delete sales");
+              } finally {
+                setDeleteModalVisible(false);
               }
-              setDeleteModalVisible(false);
             }}
           >
             Yes, Delete
