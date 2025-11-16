@@ -8,7 +8,7 @@ import "./Login.css";
 const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { setAuthData } = useContext(AuthContext);
-  const Logo_Main = require("../Assets/logo.png");
+  const Logo_Main = require("../Assets/VEERRAJLOGOR.jpg");
   const navigate = useNavigate();
 
   const onFinish = async (values: any) => {
@@ -46,7 +46,11 @@ const Login: React.FC = () => {
         <div className="circle-decor top-left" />
         <div className="circle-decor bottom-right" />
         <div className="login-content">
-          <img src={Logo_Main} alt="logo" className="logo-img" />
+          <img
+            src={Logo_Main}
+            alt="Veerraj Logo"
+            className="w-52 h-28 mx-auto mb-10"
+          />
           <h2 className="login-title">Welcome Back</h2>
           <p className="login-subtitle">Sign in to continue</p>
 
@@ -56,12 +60,18 @@ const Login: React.FC = () => {
               rules={[{ required: true, message: "Please enter your e-mail!" }]}
               className="form-item"
             >
-              <Input className="form-input" placeholder="Email address" autoComplete="email" />
+              <Input
+                className="form-input"
+                placeholder="Email address"
+                autoComplete="email"
+              />
             </Form.Item>
 
             <Form.Item
               name="password"
-              rules={[{ required: true, message: "Please enter your password!" }]}
+              rules={[
+                { required: true, message: "Please enter your password!" },
+              ]}
               className="form-item"
             >
               <Input.Password
@@ -76,7 +86,11 @@ const Login: React.FC = () => {
             </div>
 
             <Form.Item>
-              <button type="submit" disabled={isLoading} className="login-button">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="login-button"
+              >
                 {isLoading ? (
                   <>
                     <span className="loader" />

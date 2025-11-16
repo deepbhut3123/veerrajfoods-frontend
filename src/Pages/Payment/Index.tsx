@@ -134,16 +134,10 @@ const Payments: React.FC = () => {
 
   const handleSubmit = async (values: any) => {
     try {
-      // find selected dealer by _id
-      const selectedDealer = dealers.find((d) => d._id === values.dealerName);
-
       const payload = {
-        ...values,
-        orderDate: values.orderDate?.format("YYYY-MM-DD"),
-        dealerName: selectedDealer
-          ? selectedDealer.dealerName
-          : values.dealerName, // send dealerName to backend
-        totalAmount: values.totalAmount,
+        dealerId: values.dealerName, // This holds _id of dealer from dropdown
+        totalAmount: values.totalAmount, // Payment amount
+        orderDate: values.orderDate?.format("YYYY-MM-DD") || undefined,
       };
 
       if (isEditMode && selectedPayment) {
@@ -286,7 +280,11 @@ const Payments: React.FC = () => {
           .replace(/\//g, " - "); // dd-mm-yyyy
       },
     },
-    { title: "Name", dataIndex: "dealerName" },
+    {
+      title: "Name",
+      dataIndex: "dealerId",
+      render: (dealer: any) => dealer?.dealerName || "—",
+    },
     { title: "Total", dataIndex: "totalAmount" },
     {
       title: "Action",

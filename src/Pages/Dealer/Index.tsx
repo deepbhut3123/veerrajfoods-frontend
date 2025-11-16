@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Table,
   Input,
   Button,
   Space,
@@ -11,7 +10,6 @@ import {
   Row,
   Col,
   Typography,
-  Divider,
   Collapse,
   Tooltip,
 } from "antd";
@@ -138,24 +136,23 @@ const DealerManagement: React.FC = () => {
 
   // 🔹 Submit form to update dealer
   const handleUpdate = async (values: any) => {
-  try {
-    setLoading(true);
-    if (!selectedDealer) return;
+    try {
+      setLoading(true);
+      if (!selectedDealer) return;
 
-    await updateDealer(selectedDealer._id, values);
+      await updateDealer(selectedDealer._id, values);
 
-    message.success("Dealer updated successfully!");
-    setIsModalOpen(false);
-    setSelectedDealer(null); // ✅ reset after update
-    form.resetFields();
-    fetchDealers();
-  } catch (error: any) {
-    message.error(error.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
+      message.success("Dealer updated successfully!");
+      setIsModalOpen(false);
+      setSelectedDealer(null); // ✅ reset after update
+      form.resetFields();
+      fetchDealers();
+    } catch (error: any) {
+      message.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredDealers = dealers.filter((dealer) =>
     dealer.dealerName?.toLowerCase().includes(searchText.toLowerCase())
@@ -254,6 +251,19 @@ const DealerManagement: React.FC = () => {
                         gap: 10, // space between buttons
                       }}
                     >
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          fontSize: 15,
+                          color: dealer.amount < 0 ? "#b30000" : "#0a7f4f", // text color
+                          background: dealer.amount < 0 ? "#ffe6e6" : "#e8f8f2", // background color
+                          padding: "4px 10px",
+                          borderRadius: 8,
+                        }}
+                      >
+                        ₹ {dealer.amount || 0}
+                      </span>
+
                       <Tooltip title="Edit">
                         <div
                           onClick={(e) => {

@@ -105,11 +105,14 @@ const Sidebar: React.FC<SidebarProps> = ({
       "/dashboard": "Dashboard",
       "/dealer": "Dealers",
       "/sales": "Sales",
+      "/online-order": "Online orders",
+      "/payments": "Payments",
+      "/expenses": "Expenses"
     };
 
-    let title = "Veerraj Food";
+    let title = "VEERRAAJ FOODS";
     if (routeTitles[location.pathname]) {
-      title = `${routeTitles[location.pathname]} | Veerraj Food`;
+      title = `${routeTitles[location.pathname]} | VEERRAAJ FOODS`;
     }
 
     document.title = title;
