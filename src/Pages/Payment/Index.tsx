@@ -13,6 +13,7 @@ import {
   DatePicker,
   Tooltip,
   Select,
+  Tag,
 } from "antd";
 import {
   PlusCircleOutlined,
@@ -38,8 +39,14 @@ const { RangePicker } = DatePicker;
 interface Payment {
   _id: string;
   orderDate: string;
-  dealerName: string;
-  totalAmount: number;
+  dealerId:
+    | {
+        _id: string;
+        dealerName?: string;
+      }
+    | string;
+  totalAmount: number | string;
+  paymentMode: string;
 }
 
 const Payments: React.FC = () => {
@@ -138,6 +145,7 @@ const Payments: React.FC = () => {
         dealerId: values.dealerName, // This holds _id of dealer from dropdown
         totalAmount: values.totalAmount, // Payment amount
         orderDate: values.orderDate?.format("YYYY-MM-DD") || undefined,
+        paymentMode: values.paymentMode,
       };
 
       if (isEditMode && selectedPayment) {
@@ -195,6 +203,7 @@ const Payments: React.FC = () => {
           orderDate: "",
           dealerName: "Grand Total",
           totalAmount: grandTotal,
+          paymentMode: "",
         },
       ];
 
@@ -222,25 +231,34 @@ const Payments: React.FC = () => {
       setLoading(true);
       const res = await getSinglepaymentDetail(paymentId);
 
-      // FIX: adjust based on API response
-      const payments = res.data?.data || res.data;
+      // normalize response: prefer res.data.data -> res.data -> res
+      const payment = res?.data?.data ?? res?.data ?? res;
 
-      if (!payments) {
+      if (!payment) {
         message.error("Payment not found");
         return;
       }
 
+      // If API returns dealerId as object, pick its _id
+      const dealerValue =
+        payment.dealerId && typeof payment.dealerId === "object"
+          ? payment.dealerId._id
+          : payment.dealerId; // could already be id string
+
       form.setFieldsValue({
-        ...payments,
-        orderDate: payments.orderDate ? dayjs(payments.orderDate) : null,
-        dealerName: payments.dealerName,
-        totalAmount: payments.totalAmount,
+        // set orderDate as dayjs() object
+        orderDate: payment.orderDate ? dayjs(payment.orderDate) : null,
+        // the Select expects the dealer _id
+        dealerName: dealerValue,
+        totalAmount: payment.totalAmount,
+        paymentMode: payment.paymentMode,
       });
 
-      setSelectedPayment(payments);
+      setSelectedPayment(payment);
       setIsEditMode(true);
       setIsModalOpen(true);
     } catch (err) {
+      console.error(err);
       message.error("Failed to load payment details");
     } finally {
       setLoading(false);
@@ -249,8 +267,10 @@ const Payments: React.FC = () => {
 
   const fetchDealers = async () => {
     try {
-      const res = await getAllDealer();
-      setDealers(res);
+      const res: any = await getAllDealer();
+      // API might return { success: true, data: [...] } or just [...]
+      const dealersList = res?.data ?? res;
+      setDealers(dealersList || []);
     } catch (err) {
       message.error("Failed to fetch dealers");
     }
@@ -283,9 +303,44 @@ const Payments: React.FC = () => {
     {
       title: "Name",
       dataIndex: "dealerId",
-      render: (dealer: any) => dealer?.dealerName || "—",
+      render: (_: any, record: Payment) => {
+        const dealer = (record as any).dealerId;
+        return dealer
+          ? typeof dealer === "object"
+            ? dealer.dealerName
+            : dealer
+          : "—";
+      },
     },
     { title: "Total", dataIndex: "totalAmount" },
+    {
+      title: "Payment Mode",
+      dataIndex: "paymentMode",
+      render: (value: string) => {
+        const config: any = {
+          cash: { label: "Cash", color: "green" },
+          bank: { label: "Bank", color: "blue" },
+          upi: { label: "UPI", color: "purple" },
+        };
+
+        const mode = config[value];
+        return mode ? (
+          <Tag
+            color={mode.color}
+            style={{
+              fontSize: "14px",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              fontWeight: 500,
+            }}
+          >
+            {mode.label}
+          </Tag>
+        ) : (
+          "-"
+        );
+      },
+    },
     {
       title: "Action",
       width: 100,
@@ -455,7 +510,7 @@ const Payments: React.FC = () => {
         loading={loading}
         pagination={false}
         rowSelection={rowSelection}
-        // scroll={{ x: 1300, y: 650 }}
+        scroll={{ x: 1300, y: 650 }}
         // style={{ scrollbarWidth: "thin" }}
       />
       {/* </Card> */}
@@ -479,34 +534,42 @@ const Payments: React.FC = () => {
         <Form
           layout="vertical"
           form={form}
-          onFinish={handleSubmit} // ✅ unified submit
-          style={{ display: "flex", flexDirection: "column" }}
+          onFinish={handleSubmit}
           initialValues={{
-            orderDate: dayjs(), // set today's date as initial value
+            orderDate: dayjs(), // today's date
+          }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
           }}
         >
-          {/* Customer Info */}
-          <Row gutter={14}>
-            <Col span={8}>
+          {/* Row 1 */}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={8}>
               <Form.Item
                 name="orderDate"
                 label="Date"
                 rules={[{ required: true, message: "Please select a date" }]}
               >
                 <DatePicker
-                  defaultValue={dayjs()}
                   format="DD-MM-YYYY"
                   style={{ width: "100%", borderRadius: 8, height: 40 }}
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+
+            <Col xs={24} md={8}>
               <Form.Item
                 label="Dealer Name"
                 name="dealerName"
                 rules={[{ required: true, message: "Select dealer name" }]}
               >
-                <Select placeholder="Select Dealer">
+                <Select
+                  placeholder="Select Dealer"
+                  style={{ width: "100%" }}
+                  popupMatchSelectWidth={false}
+                >
                   {dealers.map((dealer) => (
                     <Select.Option key={dealer._id} value={dealer._id}>
                       {dealer.dealerName}
@@ -515,39 +578,65 @@ const Payments: React.FC = () => {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={8}>
+
+            <Col xs={24} md={8}>
               <Form.Item
                 label="Total Amount"
                 name="totalAmount"
                 rules={[{ required: true, message: "Enter total amount" }]}
               >
                 <Input
-                  // placeholder="e.g. Downtown"
+                  type="number"
+                  placeholder="Enter amount"
                   style={{ borderRadius: 8, height: 40 }}
                 />
               </Form.Item>
             </Col>
           </Row>
 
-          {/* Submit Button */}
-          <Form.Item style={{ marginTop: 12 }}>
-            <Button
-              type="primary"
-              htmlType="submit"
-              block
+          {/* Row 2 */}
+          <Row gutter={[16, 16]} align="bottom">
+            <Col xs={24} md={8}>
+              <Form.Item
+                label="Payment Mode"
+                name="paymentMode"
+                rules={[{ required: true, message: "Select payment mode" }]}
+              >
+                <Select placeholder="Select Payment Mode">
+                  <Select.Option value="cash">Cash</Select.Option>
+                  <Select.Option value="bank">Bank</Select.Option>
+                  <Select.Option value="upi">UPI</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+
+            {/* Spacer on desktop */}
+            <Col xs={0} md={8} />
+
+            <Col
+              xs={24}
+              md={8}
               style={{
-                height: 45,
-                width: "30%",
-                alignItems: "center",
-                fontWeight: 600,
-                borderRadius: 8,
-                background: "#4b6cb7",
-                borderColor: "#4b6cb7",
+                display: "flex",
+                justifyContent: "flex-end",
               }}
             >
-              Submit Payment
-            </Button>
-          </Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                style={{
+                  height: 45,
+                  minWidth: 180,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  background: "linear-gradient(135deg, #4b6cb7, #182848)",
+                  borderColor: "#4b6cb7",
+                }}
+              >
+                Submit Payment
+              </Button>
+            </Col>
+          </Row>
         </Form>
       </Modal>
       <Modal
@@ -585,7 +674,12 @@ const Payments: React.FC = () => {
         {selectedRows.length === 1 ? (
           <p>
             Are you sure you want to delete payment of{" "}
-            <b>{selectedRows[0].dealerName}</b>?
+            <b>
+              {typeof selectedRows[0].dealerId === "object"
+                ? (selectedRows[0].dealerId as any).dealerName
+                : selectedRows[0].dealerId}
+            </b>
+            ?
           </p>
         ) : selectedRows.length > 1 ? (
           <p>

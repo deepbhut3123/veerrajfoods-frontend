@@ -322,3 +322,14 @@ export const deleteExpense = async (id: string) => {
     console.error(error);
   }
 };
+
+export const exportToexcelExpenses = async (payload: any = {}) => {
+  try {
+    const response = await API.post("/backend/expense/export", payload, {
+      responseType: "blob", // important for Excel
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};

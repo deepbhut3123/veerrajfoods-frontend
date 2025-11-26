@@ -261,7 +261,7 @@ const DealerManagement: React.FC = () => {
                           borderRadius: 8,
                         }}
                       >
-                        ₹ {dealer.amount || 0}
+                        ₹ {Math.round(dealer.amount || 0)}
                       </span>
 
                       <Tooltip title="Edit">

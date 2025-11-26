@@ -1,27 +1,22 @@
-import React, { useEffect, useState } from "react";
-import { Card, Typography, Select, Row, Spin, Layout } from "antd";
+import React, { useEffect, useMemo, useState } from "react";
+import { Card, Typography, Select, Row, Col, Spin, Layout } from "antd";
 import {
-  XAxis,
-  YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   Cell,
-  AreaChart,
-  Area,
-  PieChart, // New Import for Donut Chart
-  Pie, // New Import
-  Legend, // New Import
+  PieChart,
+  Pie,
+  RadialBarChart,
+  RadialBar,
 } from "recharts";
 import dayjs from "dayjs";
-// Assuming these utility functions are defined elsewhere in the user's project
+// adjust the path to your API utils if required
 import { getOnlineOrderDetail, getAllSales } from "../Utils/Api";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { Content } = Layout;
 
-// Interface definitions remain the same
 interface Order {
   _id: string;
   orderDate: string;
@@ -50,85 +45,79 @@ interface Sale {
   }[];
 }
 
-// Custom Tooltip for better formatting - Now handles both Area/Bar and Pie charts
+/** Tooltip for Pie (Dealer) and Area-style payloads */
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    // Check if the payload is from a Pie Chart (which embeds the full data object)
-    const isPieChart = payload[0].payload && payload[0].payload.dealer;
-    let salesAmount,
-      itemLabel,
-      percentage = "";
+    const isPieChart = Boolean(payload[0].payload && payload[0].payload.dealer);
+    let salesAmount: number = 0;
+    let itemLabel = label ?? "Item";
+    let percentage = "";
 
     if (isPieChart) {
       const data = payload[0].payload;
-      salesAmount = data.sales;
-      itemLabel = data.dealer;
+      salesAmount = data.sales || 0;
+      itemLabel = data.dealer || itemLabel;
       percentage = data.percentage ? `(${data.percentage.toFixed(1)}%)` : "";
     } else {
-      // Handle Area/Bar charts
-      salesAmount = payload[0].value;
-      itemLabel = label;
+      salesAmount = payload[0].value || 0;
+      itemLabel = label ?? payload[0].name ?? "Value";
     }
 
-    // Format sales value as currency for better readability using INR (Rupee)
     const salesValue = new Intl.NumberFormat("en-IN", {
       style: "currency",
-      currency: "INR", // Rupee symbol
+      currency: "INR",
       minimumFractionDigits: 0,
     }).format(salesAmount);
 
     return (
       <div
-        className="custom-tooltip"
         style={{
           backgroundColor: "#fff",
-          padding: "10px 15px",
-          border: "1px solid #e0e0e0",
+          padding: 12,
           borderRadius: 8,
-          boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+          boxShadow: "0 4px 14px rgba(2,6,23,0.08)",
+          border: "1px solid rgba(15,23,42,0.04)",
+          minWidth: 160,
         }}
       >
-        <Text strong style={{ color: "#333" }}>
+        <div style={{ fontWeight: 600, color: "#0f172a", marginBottom: 6 }}>
           {itemLabel} {percentage}
-        </Text>
-        <p style={{ margin: 0, color: payload[0].color || "#007bff" }}>
-          Sales: <span style={{ fontWeight: "bold" }}>{salesValue}</span>
-        </p>
+        </div>
+        <div style={{ color: "#0f172a", fontWeight: 700 }}>{salesValue}</div>
       </div>
     );
   }
   return null;
 };
 
-// Custom Legend Content for the Donut Chart
+/** Legend used by Pie chart (Dealer) */
 const CustomLegend = ({ payload }: any) => {
+  if (!payload || !payload.length) return null;
   return (
-    <div style={{ marginTop: 20, textAlign: "center" }}>
-      {payload.map((entry: any, index: number) => {
+    <div style={{ marginTop: 10, textAlign: "center" }}>
+      {payload.map((entry: any, idx: number) => {
         const data = entry.payload;
-        // Ensure data has the required fields before rendering
         if (!data || data.percentage === undefined) return null;
-
         return (
           <div
-            key={`item-${index}`}
+            key={idx}
             style={{
               display: "inline-flex",
               alignItems: "center",
-              margin: "0 10px 5px 0",
+              gap: 8,
+              margin: "6px 8px",
             }}
           >
             <span
               style={{
-                display: "inline-block",
                 width: 10,
                 height: 10,
-                borderRadius: "50%",
-                backgroundColor: entry.color,
-                marginRight: 5,
+                borderRadius: 5,
+                background: entry.color,
+                display: "inline-block",
               }}
-            ></span>
-            <Text style={{ fontSize: "12px" }}>
+            />
+            <Text style={{ fontSize: 12 }}>
               {data.dealer} ({data.percentage.toFixed(1)}%)
             </Text>
           </div>
@@ -141,27 +130,28 @@ const CustomLegend = ({ payload }: any) => {
 const Dashboard: React.FC = () => {
   const [monthlyOrders, setMonthlyOrders] = useState<Order[]>([]);
   const [dealerSales, setDealerSales] = useState<Sale[]>([]);
-
   const [monthlySalesData, setMonthlySalesData] = useState<any[]>([]);
-  // Dealer data now includes 'percentage' field
   const [dealerSalesData, setDealerSalesData] = useState<any[]>([]);
   const [loadingDealer, setLoadingDealer] = useState(false);
 
-  // Initialize month and year to the current month/year
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format("MM"));
   const [selectedYear, setSelectedYear] = useState(dayjs().format("YYYY"));
-
-  // Updated modern, professional color palette
   const colors = [
-    "#007bff", // Primary Blue
-    "#28a745", // Green
-    "#ffc107", // Yellow
-    "#dc3545", // Red
-    "#6f42c1", // Purple
-    "#fd7e14", // Orange
+    "#A3E4D7", // Mint Green
+    "#76D7C4", // Aqua Green
+    "#58D68D", // Fresh Lime
+    "#2ECC71", // Classic Success Green
+    "#28B463", // Emerald Green
+    "#1D8348", // Woodland Green
+    "#27AE60", // Vibrant Grass Green
+    "#52BE80", // Soft Emerald
+    "#239B56", // Leaf Green
+    "#1B7742", // Forest Edge
+    "#145A32", // Deep Jungle
+    "#0B3D20", // Dark Moss
   ];
 
-  // Fetch data (using mock functions for runnable example)
+  // Fetch functions
   const fetchMonthlyOrders = async () => {
     try {
       const res: any = await getOnlineOrderDetail();
@@ -174,8 +164,7 @@ const Dashboard: React.FC = () => {
   const fetchDealerSales = async () => {
     setLoadingDealer(true);
     try {
-      const res = await getAllSales(); // Original
-      // const res: any = await mockGetAllSales(); // Mock
+      const res: any = await getAllSales();
       setDealerSales(res || []);
     } catch (err) {
       console.error("Failed to fetch dealer sales:", err);
@@ -184,61 +173,57 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Effect to group monthly orders for the first chart (Area Chart - Trend)
+  // Build monthlySalesData from orders
   useEffect(() => {
     const monthMap: Record<string, number> = {};
     monthlyOrders.forEach((order) => {
-      // Use YYYY-MM format for correct sorting before extracting month name
       const monthKey = dayjs(order.orderDate).format("YYYY-MM");
-      monthMap[monthKey] = (monthMap[monthKey] || 0) + order.totalAmount;
+      monthMap[monthKey] = (monthMap[monthKey] || 0) + (order.totalAmount || 0);
     });
 
-    // Convert to array and sort by date key
     const formatted = Object.keys(monthMap)
       .sort()
       .map((key) => ({
-        month: dayjs(key).format("MMM YYYY"), // Display short month name and year
+        month: dayjs(key, "YYYY-MM").format("MMM YYYY"),
         sales: monthMap[key],
       }));
+
     setMonthlySalesData(formatted);
   }, [monthlyOrders]);
 
-  // Effect to filter and aggregate dealer sales for the second chart (Donut Chart - Comparison)
+  // Build dealerSalesData with percentage for selected month/year
   useEffect(() => {
-    let totalSales = 0; // Calculate total sales for percentage breakdown
-
-    const filteredData = (dealerSales || [])
+    let totalSales = 0;
+    const grouped = (dealerSales || [])
       .filter(
         (sale) =>
           dayjs(sale.date).format("MM") === selectedMonth &&
           dayjs(sale.date).format("YYYY") === selectedYear
       )
       .reduce((acc: Record<string, number>, sale) => {
-        const dealerName = sale.dealer?.dealerName || "Unknown Dealer";
+        const name = sale.dealer?.dealerName || "Unknown Dealer";
         const amount = sale.totalAmount || 0;
-        acc[dealerName] = (acc[dealerName] || 0) + amount;
-        totalSales += amount; // Accumulate total sales
+        acc[name] = (acc[name] || 0) + amount;
+        totalSales += amount;
         return acc;
       }, {});
 
-    const formattedDealerData = Object.keys(filteredData).map((dealer) => ({
+    const formatted = Object.keys(grouped).map((dealer) => ({
       dealer,
-      sales: filteredData[dealer],
-      // Calculate percentage contribution
-      percentage:
-        totalSales > 0 ? (filteredData[dealer] / totalSales) * 100 : 0,
+      sales: grouped[dealer],
+      percentage: totalSales > 0 ? (grouped[dealer] / totalSales) * 100 : 0,
     }));
 
-    setDealerSalesData(formattedDealerData.sort((a, b) => b.sales - a.sales)); // Sort by sales for visual impact
+    setDealerSalesData(formatted.sort((a, b) => b.sales - a.sales));
   }, [dealerSales, selectedMonth, selectedYear]);
 
-  // Initial data fetch
   useEffect(() => {
     fetchMonthlyOrders();
     fetchDealerSales();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Month options for Select
+  // Month and Year options (Select dropdowns)
   const monthOptions = [
     "January",
     "February",
@@ -258,7 +243,6 @@ const Dashboard: React.FC = () => {
     </Option>
   ));
 
-  // Generate year options (current year and the past 4 years)
   const currentYear = dayjs().year();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i).map(
     (y) => (
@@ -268,16 +252,86 @@ const Dashboard: React.FC = () => {
     )
   );
 
-  // Custom Y-Axis tick formatter for currency (K for thousands), using Indian locale
-  const formatCurrency = (tick: number): string => {
-    // Uses 'en-IN' for correct grouping/separators. Retains compact notation for large numbers.
-    if (tick >= 1000) {
-      return new Intl.NumberFormat("en-IN", {
-        notation: "compact",
+  // Prepare sorted radial data and legend payload using useMemo
+  const { sortedRadialData, legendPayload } = useMemo(() => {
+    const copy = [...monthlySalesData];
+    copy.sort((a, b) => {
+      const ta = dayjs(a.month, "MMM YYYY", true).isValid()
+        ? dayjs(a.month, "MMM YYYY").valueOf()
+        : dayjs(a.month, "MMM").isValid()
+        ? dayjs(a.month, "MMM").valueOf()
+        : dayjs(a.month).valueOf();
+      const tb = dayjs(b.month, "MMM YYYY", true).isValid()
+        ? dayjs(b.month, "MMM YYYY").valueOf()
+        : dayjs(b.month, "MMM").isValid()
+        ? dayjs(b.month, "MMM").valueOf()
+        : dayjs(b.month).valueOf();
+      return ta - tb;
+    });
+
+    const mapped = copy.map((d, idx) => ({
+      name: d.month,
+      value: d.sales,
+      fill: colors[idx % colors.length],
+    }));
+
+    const payload = mapped.map((d) => ({
+      value: d.name,
+      type: "square",
+      color: d.fill,
+      payload: d,
+    }));
+
+    return { sortedRadialData: mapped, legendPayload: payload };
+  }, [monthlySalesData, colors]);
+
+  // Radial tooltip (safe)
+  const RadialCustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const item = payload[0];
+      const name = item.name ?? item.payload?.name ?? "N/A";
+      const value = item.value ?? item.payload?.value ?? 0;
+      const color = item.fill ?? item.color ?? colors[0];
+
+      const salesValue = new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
         minimumFractionDigits: 0,
-      }).format(tick);
+      }).format(value);
+
+      return (
+        <div
+          style={{
+            backgroundColor: "#fff",
+            padding: 12,
+            borderRadius: 8,
+            boxShadow: "0 6px 20px rgba(2,6,23,0.08)",
+            border: "1px solid rgba(15,23,42,0.04)",
+            minWidth: 160,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 5,
+                background: color,
+                display: "inline-block",
+              }}
+            />
+            <Text strong style={{ color: "#0f172a" }}>
+              {name}
+            </Text>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 12, color: "#374151" }}>Sales</div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>{salesValue}</div>
+          </div>
+        </div>
+      );
     }
-    return tick.toString();
+    return null;
   };
 
   return (
@@ -285,171 +339,205 @@ const Dashboard: React.FC = () => {
       style={{
         padding: "24px",
         background: "#f5f7fa",
-        display: "grid",
-        gridTemplateColumns: "1fr",
-        gap: "24px",
-        minHeight: "100vh", // Full viewport height
-        maxHeight: "100vh", // Ensure it doesn’t shrink
-        overflowY: "auto", // Enable vertical scrolling
-        boxSizing: "border-box", // Ensure padding is included in height
+        boxSizing: "border-box",
+        minHeight: "100vh",
       }}
     >
-      {/* Monthly Sales Chart (Area Chart for Trend) */}
-      <Card
-        bordered={false}
-        style={{
-          borderRadius: 16,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.08)", // Deeper, softer shadow
-          background: "#ffffff",
-        }}
-        bodyStyle={{ padding: "24px" }}
-      >
-        <Title
-          level={4}
-          style={{ marginBottom: 20, color: "#1f2937", fontWeight: 600 }}
-        >
-          Overall Online Sales Trend
-        </Title>
-
-        <ResponsiveContainer width="100%" height={350}>
-          <AreaChart
-            data={monthlySalesData}
-            margin={{ top: 20, right: 30, left: 10, bottom: 5 }}
-          >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              vertical={false}
-              stroke="#e0e7ee" // Lighter, more subtle grid lines
-            />
-            <XAxis
-              dataKey="month"
-              axisLine={false}
-              tickLine={false}
-              style={{ fontSize: "12px", fill: "#6b7280" }}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={formatCurrency}
-              style={{ fontSize: "12px", fill: "#6b7280" }}
-            />
-            <Tooltip content={<CustomTooltip />} />
-
-            {/* Define the gradient for the Area fill */}
-            <defs>
-              <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={colors[0]} stopOpacity={0.8} />
-                <stop offset="95%" stopColor={colors[0]} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-
-            <Area
-              type="monotone" // Creates a smooth curve
-              dataKey="sales"
-              stroke={colors[0]} // Primary color for the line
-              strokeWidth={3}
-              fill="url(#colorSales)" // Gradient fill
-              dot={{ stroke: colors[0], strokeWidth: 2, r: 4 }} // Dots for visual emphasis
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </Card>
-
-      {/* Dealer-wise Monthly Sales Chart (Now a Design-Focused Donut Chart) */}
-      <Card
-        bordered={false}
-        style={{
-          borderRadius: 16,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-          background: "#ffffff",
-          marginBottom: 50,
-        }}
-        bodyStyle={{ padding: "24px" }}
-      >
-        <Row
-          justify="space-between"
-          align="middle"
-          style={{ marginBottom: 20 }}
-        >
-          <Title
-            level={4}
-            style={{ color: "#1f2937", fontWeight: 600, margin: 0 }}
-          >
-            Dealer Contribution Breakdown
-          </Title>
-          <div style={{ display: "flex", gap: 12 }}>
-            <Select
-              value={selectedMonth}
-              onChange={(val) => setSelectedMonth(val)}
-              style={{ width: 140 }}
-              placeholder="Select Month"
-            >
-              {monthOptions}
-            </Select>
-            <Select
-              value={selectedYear}
-              onChange={(val) => setSelectedYear(val)}
-              style={{ width: 100 }}
-              placeholder="Select Year"
-            >
-              {yearOptions}
-            </Select>
-          </div>
-        </Row>
-
-        {loadingDealer ? (
-          <div
+      <Row gutter={[24, 24]}>
+        {/* Left column: Radial (Monthly) */}
+        <Col xs={24} sm={24} md={12}>
+          <Card
+            bordered={false}
             style={{
-              height: 350,
+              borderRadius: 16,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+              background: "#ffffff",
+              minHeight: 520, // ensure card is tall enough
               display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
+              flexDirection: "column",
+              justifyContent: "space-between",
+            }}
+            bodyStyle={{
+              padding: 24,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
             }}
           >
-            <Spin size="large" tip="Loading Dealer Data..." />
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height={400}>
-            {dealerSalesData.length > 0 ? (
-              <PieChart>
-                <Tooltip content={<CustomTooltip />} />
-                <Pie
-                  data={dealerSalesData}
-                  dataKey="sales"
-                  nameKey="dealer"
-                  cx="50%" // Center X
-                  cy="50%" // Center Y
-                  innerRadius={80} // Donut hole size
-                  outerRadius={140} // Outer size
-                  paddingAngle={3} // Small gap between slices for visual separation
-                  stroke="none"
-                  labelLine={false}
+            <div>
+              <Title
+                level={4}
+                style={{ marginBottom: 20, color: "#1f2937", fontWeight: 600 }}
+              >
+                Overall Online Sales Trend
+              </Title>
+            </div>
+
+            {/* Chart area grows to take available space */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 420,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <ResponsiveContainer width="100%" height={420}>
+                <RadialBarChart
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="18%"
+                  outerRadius="88%"
+                  barSize={18}
+                  data={sortedRadialData}
                 >
-                  {dealerSalesData.map((_, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={colors[index % colors.length]}
-                      style={{
-                        filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))",
-                      }} // Added drop shadow for design
-                    />
-                  ))}
-                </Pie>
-                {/* Use a CustomLegend for clear percentage display */}
-                <Legend
-                  content={<CustomLegend />}
-                  layout="horizontal"
-                  align="center"
-                  verticalAlign="bottom"
-                />
-              </PieChart>
+                  <Tooltip content={<RadialCustomTooltip />} />
+                  <RadialBar background dataKey="value" cornerRadius={999} />
+                </RadialBarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Custom legend rendered under the chart (TypeScript-safe) */}
+            <div style={{ marginTop: 12, textAlign: "center" }}>
+              {legendPayload.map((entry: any, i: number) => (
+                <span
+                  key={i}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    margin: "6px 8px",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 4,
+                      background: entry.color,
+                      display: "inline-block",
+                    }}
+                  />
+                  <Text style={{ fontSize: 13 }}>{entry.value}</Text>
+                </span>
+              ))}
+            </div>
+          </Card>
+        </Col>
+
+        {/* Right column: Dealer Donut */}
+        <Col xs={24} sm={24} md={12}>
+          <Card
+            bordered={false}
+            style={{
+              borderRadius: 16,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+              background: "#ffffff",
+              minHeight: 540, // a bit taller so donut has breathing room
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+            }}
+            bodyStyle={{
+              padding: 24,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <Title
+                level={4}
+                style={{ margin: 0, color: "#1f2937", fontWeight: 600 }}
+              >
+                Dealer Contribution Breakdown
+              </Title>
+
+              <div style={{ display: "flex", gap: 12 }}>
+                <Select
+                  value={selectedMonth}
+                  onChange={(val) => setSelectedMonth(val)}
+                  style={{ width: 140 }}
+                  placeholder="Select Month"
+                >
+                  {monthOptions}
+                </Select>
+
+                <Select
+                  value={selectedYear}
+                  onChange={(val) => setSelectedYear(val)}
+                  style={{ width: 100 }}
+                  placeholder="Select Year"
+                >
+                  {yearOptions}
+                </Select>
+              </div>
+            </div>
+
+            {loadingDealer ? (
+              <div
+                style={{
+                  height: 420,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Spin size="large" tip="Loading Dealer Data..." />
+              </div>
+            ) : dealerSalesData.length > 0 ? (
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 420,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <ResponsiveContainer width="100%" height={480}>
+                  <PieChart>
+                    <Tooltip content={<CustomTooltip />} />
+                    <Pie
+                      data={dealerSalesData}
+                      dataKey="sales"
+                      nameKey="dealer"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={90}
+                      outerRadius={160}
+                      paddingAngle={3}
+                      stroke="none"
+                      labelLine={false}
+                    >
+                      {dealerSalesData.map((_, i) => (
+                        <Cell
+                          key={`cell-${i}`}
+                          fill={colors[i % colors.length]}
+                          style={{
+                            filter: "drop-shadow(0 2px 8px rgba(2,6,23,0.07))",
+                          }}
+                        />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
               <div
                 style={{
-                  height: "100%",
+                  height: 220,
                   display: "flex",
-                  justifyContent: "center",
                   alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
                 <Text type="secondary">
@@ -457,9 +545,21 @@ const Dashboard: React.FC = () => {
                 </Text>
               </div>
             )}
-          </ResponsiveContainer>
-        )}
-      </Card>
+
+            {/* Dealer legend (reuse CustomLegend by building payload similar to before) */}
+            {dealerSalesData.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <CustomLegend
+                  payload={dealerSalesData.map((d: any, i: number) => ({
+                    payload: d,
+                    color: colors[i % colors.length],
+                  }))}
+                />
+              </div>
+            )}
+          </Card>
+        </Col>
+      </Row>
     </Content>
   );
 };

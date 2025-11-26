@@ -886,3 +886,10 @@ element.style {
 .compact-table .ant-table-tbody > tr > td {
   font-size: 14px;
 }
+
+/* Hide YEAR navigation arrows only */
+.ant-picker-header-super-prev-btn,
+.ant-picker-header-super-next-btn {
+  display: none !important;
+}
+

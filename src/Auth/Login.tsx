@@ -80,11 +80,6 @@ const Login: React.FC = () => {
                 autoComplete="current-password"
               />
             </Form.Item>
-
-            <div className="forgot-password">
-              <Link to="/forgot-password">Forgot password?</Link>
-            </div>
-
             <Form.Item>
               <button
                 type="submit"

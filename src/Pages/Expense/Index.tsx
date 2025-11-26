@@ -12,17 +12,15 @@ import {
   Col,
   DatePicker,
   Tooltip,
-  Select,
   AutoComplete,
 } from "antd";
 import {
   PlusCircleOutlined,
   DeleteOutlined,
-  EyeInvisibleOutlined,
-  EyeOutlined,
   ExclamationCircleOutlined,
   EditOutlined,
   DownOutlined,
+  ExportOutlined, // ✅ NEW
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
@@ -31,6 +29,7 @@ import {
   getExpense,
   getSingleExpense,
   updateExpense,
+  exportToexcelExpenses, // ✅ NEW
 } from "../../Utils/Api";
 
 const { Title } = Typography;
@@ -49,11 +48,9 @@ const Expenses: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [grandTotal, setGrandTotal] = useState(0);
-  const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [searchValue, setSearchValue] = useState("");
-  //   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedDateRange, setSelectedDateRange] = useState<
     [string, string] | null
   >(null);
@@ -67,6 +64,19 @@ const Expenses: React.FC = () => {
       setSelectedRowKeys(newSelectedRowKeys);
       setSelectedRows(newSelectedRows);
     },
+  };
+
+  const refetchWithCurrentFilters = () => {
+    if (selectedDateRange) {
+      const [startDate, endDate] = selectedDateRange;
+      fetchExpenses({
+        startDate,
+        endDate,
+        search: searchValue || "",
+      });
+    } else {
+      fetchExpenses(); // fallback
+    }
   };
 
   const fetchExpenses = async (filters: any = {}) => {
@@ -94,7 +104,6 @@ const Expenses: React.FC = () => {
     const startOfMonth = dayjs().startOf("month").format("YYYY-MM-DD");
     const endOfMonth = dayjs().endOf("month").format("YYYY-MM-DD");
 
-    // set initial range so RangePicker also knows current month
     setSelectedDateRange([startOfMonth, endOfMonth]);
 
     fetchExpenses({
@@ -125,7 +134,7 @@ const Expenses: React.FC = () => {
       setIsModalOpen(false);
       setIsEditMode(false);
       setSelectedExpense(null);
-      fetchExpenses();
+      refetchWithCurrentFilters();
     } catch (error) {
       message.error(
         isEditMode ? "Failed to update expense" : "Failed to add expense"
@@ -137,11 +146,12 @@ const Expenses: React.FC = () => {
     try {
       await deleteExpense(id);
       message.success("Expense deleted successfully");
-      fetchExpenses();
+      refetchWithCurrentFilters();
     } catch (error) {
       message.error("Failed to delete expense");
     }
   };
+
   const handleCancel = () => {
     setIsModalOpen(false);
     form.resetFields();
@@ -152,7 +162,6 @@ const Expenses: React.FC = () => {
       setLoading(true);
       const res = await getSingleExpense(expenseId);
 
-      // FIX: adjust based on API response
       const expense = res.data?.data || res.data;
 
       if (!expense) {
@@ -172,6 +181,36 @@ const Expenses: React.FC = () => {
       message.error("Failed to load expense details");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✅ Export to Excel
+  const handleExportExcel = async () => {
+    if (selectedRows.length === 0) {
+      message.warning("Please select at least one expense to export.");
+      return;
+    }
+
+    try {
+      const res = await exportToexcelExpenses({
+        payload: selectedRows, // send selected rows
+      });
+
+      const blob = new Blob([res], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Expenses.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      message.error("Failed to export expenses to Excel");
     }
   };
 
@@ -195,37 +234,36 @@ const Expenses: React.FC = () => {
             month: "2-digit",
             year: "2-digit",
           })
-          .replace(/\//g, " - "); // dd-mm-yyyy
+          .replace(/\//g, " - ");
       },
     },
     { title: "Description", dataIndex: "desc" },
     { title: "Total", dataIndex: "amount" },
     {
       title: "Action",
+      align: "center" as "center",
       render: (_: any, record: Expense) => (
-        <>
-          <div style={{ display: "flex", justifyContent: "center", gap: 4 }}>
-            <Tooltip title="Edit">
-              <div
-                onClick={() => handleEdit(record._id)}
-                style={{
-                  cursor: "pointer",
-                  width: 30,
-                  height: 30,
-                  borderRadius: 20,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "linear-gradient(135deg, #36d1dc, #5b86e5)",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-                  transition: "all 0.3s",
-                }}
-              >
-                <EditOutlined style={{ fontSize: 16, color: "#fff" }} />
-              </div>
-            </Tooltip>
-          </div>
-        </>
+        <div style={{ display: "flex", justifyContent: "center", gap: 4 }}>
+          <Tooltip title="Edit">
+            <div
+              onClick={() => handleEdit(record._id)}
+              style={{
+                cursor: "pointer",
+                width: 30,
+                height: 30,
+                borderRadius: 20,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "linear-gradient(135deg, #36d1dc, #5b86e5)",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                transition: "all 0.3s",
+              }}
+            >
+              <EditOutlined style={{ fontSize: 16, color: "#fff" }} />
+            </div>
+          </Tooltip>
+        </div>
       ),
     },
   ];
@@ -244,7 +282,7 @@ const Expenses: React.FC = () => {
         align="middle"
         justify="space-between"
         style={{ marginBottom: 16 }}
-        wrap={false} // prevent wrapping to new line
+        wrap={false}
       >
         {/* Left side: Title + Search + RangePicker */}
         <Col flex="auto">
@@ -265,7 +303,6 @@ const Expenses: React.FC = () => {
             </Title>
 
             <Input.Search
-              // placeholder="Search by customer, phone, area..."
               allowClear
               onSearch={(value) => {
                 const [startDate, endDate] = selectedDateRange || [];
@@ -279,9 +316,9 @@ const Expenses: React.FC = () => {
 
             <RangePicker
               style={{ flex: 1, minWidth: 220, maxWidth: 260 }}
-              onChange={(dates, dateStrings) => {
+              onChange={(_dates, dateStrings) => {
                 const [startDate, endDate] = dateStrings;
-                setSelectedDateRange(dateStrings);
+                setSelectedDateRange(dateStrings as [string, string]);
                 fetchExpenses({
                   search: searchValue,
                   startDate,
@@ -291,6 +328,8 @@ const Expenses: React.FC = () => {
             />
           </Space>
         </Col>
+
+        {/* Total Card */}
         <Col>
           <div
             style={{
@@ -325,8 +364,29 @@ const Expenses: React.FC = () => {
                   padding: "6px 16px",
                   borderRadius: "8px",
                 }}
-              ></Button>
+              />
             </Tooltip>
+
+            {/* ✅ Export Button */}
+            <Tooltip title="Export to Excel">
+              <Button
+                type="default"
+                icon={<ExportOutlined />}
+                onClick={handleExportExcel}
+                disabled={selectedRows.length === 0}
+                style={{
+                  background:
+                    selectedRows.length === 0
+                      ? "linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%)"
+                      : "linear-gradient(135deg, #28a745 0%, #85d96b 100%)",
+                  border: "none",
+                  color: selectedRows.length === 0 ? "#888" : "#fff",
+                  borderRadius: "8px",
+                  padding: "6px 16px",
+                }}
+              />
+            </Tooltip>
+
             <Tooltip title="Delete">
               <Button
                 type="default"
@@ -351,16 +411,6 @@ const Expenses: React.FC = () => {
         </Col>
       </Row>
 
-      {/* <Card
-        style={{
-          borderRadius: "20px",
-          //   padding: "14px",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.05)",
-          background: "#ffffff",
-          marginTop: "28px",
-          height: "100%",
-        }}
-      > */}
       <Table
         rowKey="_id"
         columns={columns}
@@ -369,7 +419,7 @@ const Expenses: React.FC = () => {
         pagination={false}
         rowSelection={rowSelection}
       />
-      {/* </Card> */}
+
       <Modal
         title={
           <Title level={4} style={{ margin: 0, color: "#00695c" }}>
@@ -390,13 +440,12 @@ const Expenses: React.FC = () => {
         <Form
           layout="vertical"
           form={form}
-          onFinish={handleSubmit} // ✅ unified submit
+          onFinish={handleSubmit}
           style={{ display: "flex", flexDirection: "column" }}
           initialValues={{
-            date: dayjs(), // set today's date as initial value
+            date: dayjs(),
           }}
         >
-          {/* Customer Info */}
           <Row gutter={14}>
             <Col span={8}>
               <Form.Item
@@ -405,7 +454,6 @@ const Expenses: React.FC = () => {
                 rules={[{ required: true, message: "Please select a date" }]}
               >
                 <DatePicker
-                  defaultValue={dayjs()}
                   format="DD-MM-YYYY"
                   style={{ width: "100%", borderRadius: 8, height: 40 }}
                 />
@@ -439,7 +487,7 @@ const Expenses: React.FC = () => {
                 >
                   <Input
                     style={{ borderRadius: 8, height: 40 }}
-                    suffix={<DownOutlined />} // dropdown arrow
+                    suffix={<DownOutlined />}
                   />
                 </AutoComplete>
               </Form.Item>
@@ -451,15 +499,11 @@ const Expenses: React.FC = () => {
                 name="amount"
                 rules={[{ required: true, message: "Enter total amount" }]}
               >
-                <Input
-                  // placeholder="e.g. Downtown"
-                  style={{ borderRadius: 8, height: 40 }}
-                />
+                <Input style={{ borderRadius: 8, height: 40 }} />
               </Form.Item>
             </Col>
           </Row>
 
-          {/* Submit Button */}
           <Form.Item style={{ marginTop: 12 }}>
             <Button
               type="primary"
@@ -480,6 +524,7 @@ const Expenses: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
       <Modal
         title={
           <span style={{ color: "#ff4d4f", fontWeight: 600 }}>
@@ -499,11 +544,10 @@ const Expenses: React.FC = () => {
             danger
             onClick={async () => {
               if (selectedRows.length > 0) {
-                // Delete all selected expenses
                 for (const expense of selectedRows) {
                   await handleDelete(expense._id);
                 }
-                setSelectedRows([]); // clear selection after deletion
+                setSelectedRows([]);
               }
               setDeleteModalVisible(false);
             }}

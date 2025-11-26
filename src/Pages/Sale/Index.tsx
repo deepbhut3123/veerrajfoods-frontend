@@ -11,7 +11,6 @@ import {
   Typography,
   message,
   Row,
-  Card,
   Space,
   Tooltip,
 } from "antd";
@@ -52,6 +51,9 @@ const SalesPage: React.FC = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [salesData, setSalesData] = useState<any[]>([]); // table data
   const [totalAmount, setTotalAmount] = useState(0);
+  const [kataAmount, setKataAmount] = useState(0);
+  const [transportAmount, setTransportAmount] = useState(0);
+  const [finalTotalAmount, setFinalTotalAmount] = useState(0);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
   const [expandedRowKeys, setExpandedRowKeys] = useState<string[]>([]);
@@ -154,6 +156,8 @@ const SalesPage: React.FC = () => {
         form.setFieldsValue({
           date: moment(sale.date),
           dealerId: sale.dealer._id,
+          kata: sale.kata || 0,
+          transport: sale.transport || 0,
         });
 
         setSelectedDealer(sale.dealer);
@@ -164,7 +168,9 @@ const SalesPage: React.FC = () => {
         }));
 
         setProducts(initialProducts);
-        calculateTotal(initialProducts);
+        setKataAmount(sale.kata || 0);
+        setTransportAmount(sale.transport || 0);
+        calculateTotal(initialProducts, sale.kata || 0, sale.transport || 0);
       } else {
         // Add mode
         setEditMode(false);
@@ -172,6 +178,9 @@ const SalesPage: React.FC = () => {
         form.resetFields();
         setProducts([]);
         setTotalAmount(0);
+        setKataAmount(0);
+        setTransportAmount(0);
+        setFinalTotalAmount(0);
       }
 
       setVisible(true);
@@ -191,6 +200,9 @@ const SalesPage: React.FC = () => {
           dealerName: sale.dealer?.dealerName || "Unknown",
           products: sale.products || [],
           totalAmount: sale.totalAmount,
+          kata: sale.kata || 0,
+          transport: sale.transport || 0,
+          finalTotal: sale.finalTotal || sale.totalAmount,
         }))
       );
     } catch (err) {
@@ -213,7 +225,7 @@ const SalesPage: React.FC = () => {
     }));
 
     setProducts(initialProducts);
-    calculateTotal(initialProducts);
+    calculateTotal(initialProducts, kataAmount, transportAmount);
   };
 
   const handleQuantityChange = (value: number, index: number) => {
@@ -221,12 +233,27 @@ const SalesPage: React.FC = () => {
     updated[index].quantity = value;
     updated[index].total = value * updated[index].productPrice;
     setProducts(updated);
-    calculateTotal(updated);
+    calculateTotal(updated, kataAmount, transportAmount);
   };
 
-  const calculateTotal = (items: any[]) => {
-    const total = items.reduce((acc, item) => acc + item.total, 0);
-    setTotalAmount(total);
+  const handleKataChange = (value: number | null) => {
+    const safe = value ?? 0;
+    setKataAmount(safe);
+    calculateTotal(products, safe, transportAmount);
+  };
+
+  const handleTransportChange = (value: number | null) => {
+    const safe = value ?? 0;
+    setTransportAmount(safe);
+    calculateTotal(products, kataAmount, safe);
+  };
+
+  const calculateTotal = (items: any[], kata: number, transport: number) => {
+    const productTotal = items.reduce((acc, item) => acc + item.total, 0);
+    setTotalAmount(productTotal);
+
+    const finalTotal = productTotal + kata + transport;
+    setFinalTotalAmount(finalTotal);
   };
 
   const handleDeleteSale = async (saleId: string) => {
@@ -250,15 +277,16 @@ const SalesPage: React.FC = () => {
       const payload = {
         date: values.date.format("YYYY-MM-DD"),
         dealerId: values.dealerId,
-        products: products
-          .filter((p) => p.quantity > 0)
-          .map((p) => ({
-            productName: p.productName,
-            productPrice: p.productPrice,
-            quantity: p.quantity,
-            total: p.total,
-          })),
+        products: products.map((p) => ({
+          productName: p.productName,
+          productPrice: p.productPrice,
+          quantity: p.quantity || 0, // <-- ensure 0 is sent
+          total: (p.quantity || 0) * p.productPrice, // recalc total
+        })),
         totalAmount,
+        kata: values.kata || 0,
+        transport: values.transport || 0,
+        finalTotal: finalTotalAmount,
       };
 
       if (editMode && editingSaleId) {
@@ -274,6 +302,9 @@ const SalesPage: React.FC = () => {
       form.resetFields();
       setProducts([]);
       setTotalAmount(0);
+      setKataAmount(0);
+      setTransportAmount(0);
+      setFinalTotalAmount(0);
     } catch (err) {
       message.error(
         editMode ? "Failed to update sale" : "Failed to create sale"
@@ -289,7 +320,8 @@ const SalesPage: React.FC = () => {
     return (
       item.dealerName?.toLowerCase().includes(search) ||
       item.date?.toLowerCase().includes(search) ||
-      item.totalAmount?.toString().includes(search)
+      item.totalAmount?.toString().includes(search) ||
+      item.finalTotal?.toString().includes(search)
     );
   });
 
@@ -299,9 +331,15 @@ const SalesPage: React.FC = () => {
       return;
     }
 
-    setSelectedSale(sale); // set the selected sale
+    setSelectedSale(sale);
 
     await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // 🔥 Set dealer name on heading
+    const headingEl = document.getElementById("bill-heading");
+    if (headingEl) {
+      headingEl.innerText = sale?.dealer?.dealerName || "";
+    }
 
     const billElement = document.getElementById("bill-to-capture");
     if (!billElement) return;
@@ -333,6 +371,13 @@ const SalesPage: React.FC = () => {
 
     await new Promise((resolve) => setTimeout(resolve, 100));
 
+    // 🔥 Set dealer name
+    const dealerName = selectedRows[0]?.dealer?.dealerName || "";
+    const headingEl = document.getElementById("bill-heading-top");
+    if (headingEl) {
+      headingEl.innerText = dealerName;
+    }
+
     const billElement = document.getElementById("bill-to-capture-top");
     if (!billElement) return;
 
@@ -353,7 +398,7 @@ const SalesPage: React.FC = () => {
   };
 
   const selectedTotalAmount = selectedRows.reduce(
-    (acc, sale) => acc + (sale.totalAmount || 0),
+    (acc, sale) => acc + (sale.finalTotal || sale.totalAmount || 0),
     0
   );
 
@@ -381,7 +426,7 @@ const SalesPage: React.FC = () => {
     {
       title: "Total",
       dataIndex: "total",
-      render: (total: number) => `₹ ${total}`,
+      render: (total: number) => `₹ ${total?.toFixed(2)}`,
     },
   ];
 
@@ -398,6 +443,7 @@ const SalesPage: React.FC = () => {
     {
       title: "Date",
       dataIndex: "date",
+      align: "center" as const,
       sorter: (a: any, b: any) =>
         new Date(a.date).getTime() - new Date(b.date).getTime(),
       render: (date: string) =>
@@ -406,13 +452,15 @@ const SalesPage: React.FC = () => {
     {
       title: "Dealer Name",
       dataIndex: "dealerName",
+      align: "center" as const,
       sorter: (a: any, b: any) =>
         (a.dealerName || "").localeCompare(b.dealerName || ""),
       render: (name: string) => name || "Unknown",
     },
     {
-      title: "Total Amount (₹)",
+      title: "Product Total (₹)",
       dataIndex: "totalAmount",
+      align: "center" as const,
       sorter: (a: any, b: any) => (a.totalAmount || 0) - (b.totalAmount || 0),
       render: (amount: number | undefined) => {
         const safeAmount = amount || 0;
@@ -653,6 +701,9 @@ const SalesPage: React.FC = () => {
           form.resetFields();
           setProducts([]);
           setTotalAmount(0);
+          setKataAmount(0);
+          setTransportAmount(0);
+          setFinalTotalAmount(0);
         }}
         onOk={() => form.submit()}
         width={900}
@@ -699,6 +750,40 @@ const SalesPage: React.FC = () => {
             </Form.Item>
           </div>
 
+          {/* Additional Charges Section */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "16px",
+              marginBottom: "16px",
+            }}
+          >
+            <Form.Item
+              label={<span style={{ fontWeight: "500" }}>Kata </span>}
+              name="kata"
+            >
+              <InputNumber
+                style={{ width: "100%" }}
+                min={0}
+                placeholder="Enter kata amount"
+                onChange={handleKataChange}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label={<span style={{ fontWeight: "500" }}>Transport (₹)</span>}
+              name="transport"
+            >
+              <InputNumber
+                style={{ width: "100%" }}
+                min={0}
+                placeholder="Enter transport amount"
+                onChange={handleTransportChange}
+              />
+            </Form.Item>
+          </div>
+
           {/* Products Table */}
           {products.length > 0 && (
             <div style={{ margin: "24px 0" }}>
@@ -708,13 +793,11 @@ const SalesPage: React.FC = () => {
                 pagination={false}
                 bordered
                 size="middle"
-                // scroll={{ y: 240 }}
-
                 summary={() => (
                   <Table.Summary fixed>
                     <Table.Summary.Row>
                       <Table.Summary.Cell index={0} colSpan={3} align="right">
-                        <strong>Grand Total</strong>
+                        <strong>Product Total</strong>
                       </Table.Summary.Cell>
                       <Table.Summary.Cell index={1}>
                         <strong>₹ {totalAmount.toLocaleString("en-IN")}</strong>
@@ -824,213 +907,381 @@ const SalesPage: React.FC = () => {
       </Modal>
 
       {/* Sales History Table */}
-      <Card
-        style={{
-          borderRadius: "20px",
-          // padding: "32px",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.05)",
-          background: "#ffffff",
-          marginTop: "28px",
-          height: "100%",
+      <Table
+        style={{ marginTop: "15px" }}
+        pagination={false}
+        dataSource={filteredData}
+        columns={salesTableColumns}
+        scroll={{ x: 1300, y: 650 }}
+        rowSelection={{
+          selectedRowKeys: selectedRows.map((r) => r.key),
+          onChange: (_selectedKeys, selectedRecords) => {
+            setSelectedRows(selectedRecords);
+          },
         }}
-      >
-        <Table
-          dataSource={filteredData}
-          columns={salesTableColumns}
-          pagination={{ pageSize: 5 }}
-          scroll={{ x: 1000, y: 450 }}
-          rowSelection={{
-            selectedRowKeys: selectedRows.map((r) => r.key),
-            onChange: (_selectedKeys, selectedRecords) => {
-              setSelectedRows(selectedRecords);
-            },
-          }}
-          expandable={{
-            expandedRowKeys,
-            expandIconColumnIndex: -1,
-            onExpand: (expanded, record) => toggleExpand(record.key),
-            expandedRowRender: (record: any) => {
-              const sale = salesData.find((s) => s.key === record.key);
+        expandable={{
+          expandedRowKeys,
+          expandIconColumnIndex: -1,
+          onExpand: (expanded, record) => toggleExpand(record.key),
+          expandedRowRender: (record: any) => {
+            const sale = salesData.find((s) => s.key === record.key);
 
-              return (
-                <AnimatePresence initial={false}>
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                    style={{ overflow: "hidden" }}
+            return (
+              <AnimatePresence initial={false}>
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  style={{ overflow: "hidden" }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "16px",
+                      alignItems: "flex-start",
+                    }}
                   >
-                    {/* ✅ Only one nested table here */}
-                    <Table
-                      dataSource={sale?.products || []}
-                      pagination={false}
-                      size="small"
-                      rowKey={(_item: any, index?: number) =>
-                        index !== undefined ? index.toString() : ""
-                      }
-                      columns={[
-                        {
-                          title: "Product",
-                          dataIndex: "productName",
-                          key: "productName",
-                        },
-                        {
-                          title: "Quantity",
-                          dataIndex: "quantity",
-                          key: "quantity",
-                        },
-                        {
-                          title: "Price (₹)",
-                          dataIndex: "productPrice",
-                          key: "productPrice",
-                          render: (price: number) =>
-                            `₹ ${Math.floor(price).toLocaleString("en-IN")}`,
-                        },
-                        {
-                          title: "Total (₹)",
-                          dataIndex: "total",
-                          key: "total",
-                          render: (total: number) =>
-                            `₹ ${Math.floor(total).toLocaleString("en-IN")}`,
-                        },
-                      ]}
+                    {/* Products Table */}
+                    <div style={{ flex: 1 }}>
+                      <Table
+                        dataSource={sale?.products || []}
+                        pagination={false}
+                        size="small"
+                        rowKey={(_item: any, index?: number) =>
+                          index !== undefined ? index.toString() : ""
+                        }
+                        columns={[
+                          {
+                            title: "Product",
+                            dataIndex: "productName",
+                            key: "productName",
+                          },
+                          {
+                            title: "Quantity",
+                            dataIndex: "quantity",
+                            key: "quantity",
+                          },
+                          {
+                            title: "Total (₹)",
+                            dataIndex: "total",
+                            key: "total",
+                            render: (total: number) =>
+                              `₹ ${Math.floor(total).toLocaleString("en-IN")}`,
+                          },
+                        ]}
+                        style={{
+                          fontSize: "12px",
+                        }}
+                        className="compact-table"
+                      />
+                    </div>
+
+                    {/* Additional Charges - Positioned next to the table */}
+                    <div
                       style={{
-                        fontSize: 12, // 🔹 smaller text
-                        maxWidth: "800px",
+                        minWidth: "200px",
+                        background: "#f9f9f9",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        border: "1px solid #e8e8e8",
                       }}
-                      className="compact-table"
-                    />
-                  </motion.div>
-                </AnimatePresence>
-              );
-            },
-          }}
-        />
-      </Card>
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "6px",
+                          fontSize: "22px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>
+                            <strong>Kata:</strong>
+                          </span>
+                          <span>
+                            {" "}
+                            {Math.floor(sale?.kata || 0).toLocaleString(
+                              "en-IN"
+                            )}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>
+                            <strong>Transport:</strong>
+                          </span>
+                          <span>
+                            ₹{" "}
+                            {Math.floor(sale?.transport || 0).toLocaleString(
+                              "en-IN"
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            );
+          },
+        }}
+      />
       <div
         id="bill-to-capture"
         style={{
           position: "absolute",
           top: "-9999px",
           left: "-9999px",
-          width: "400px",
-          padding: "16px",
-          backgroundColor: "#fff",
+          width: "380px",
+          padding: "20px",
+          backgroundColor: "#ffffff",
           fontFamily: "'Inter', sans-serif",
+          fontSize: "13px",
+          color: "#222",
+          borderRadius: "10px",
+          boxShadow: "0 0 6px rgba(0,0,0,0.15)",
         }}
       >
-        <h3 style={{ margin: 0, marginBottom: 8 }}>Bill</h3>
-        <p style={{ marginBottom: 8 }}>
-          Date: {dayjs(selectedSale?.date).format("DD-MM-YYYY")}
-        </p>
+        {/* HEADER */}
+        <div style={{ textAlign: "center", marginBottom: "16px" }}>
+          <h2
+            id="bill-heading"
+            style={{
+              margin: 0,
+              fontSize: "19px",
+              fontWeight: "700",
+            }}
+          >
+            {" "}
+          </h2>
 
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th style={{ border: "1px solid #ccc", padding: "4px" }}>
-                Product
-              </th>
-              <th style={{ border: "1px solid #ccc", padding: "4px" }}>Qty</th>
-              <th style={{ border: "1px solid #ccc", padding: "4px" }}>
-                Price
-              </th>
-              <th style={{ border: "1px solid #ccc", padding: "4px" }}>
-                Total
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {selectedSale?.products?.map((p: any, index: number) => (
-              <tr key={index}>
-                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
-                  {p.productName}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
-                  {p.quantity}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
-                  ₹ {Math.floor(p.productPrice)}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
-                  ₹ {Math.floor(p.total)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          <div style={{ marginTop: "4px", fontSize: "11px", color: "#666" }}>
+            Invoice / Sales Receipt
+          </div>
+        </div>
 
-        <p style={{ textAlign: "right", marginTop: 8, fontWeight: 600 }}>
-          Total: ₹ {Math.floor(selectedSale?.totalAmount)}
-        </p>
+        {/* DATE BLOCK */}
+        <div
+          style={{
+            background: "#f7f7f7",
+            padding: "8px 12px",
+            borderRadius: "8px",
+            marginBottom: "12px",
+            display: "flex",
+            justifyContent: "space-between",
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>Date</span>
+          <span>{dayjs(selectedSale?.date).format("DD-MM-YYYY")}</span>
+        </div>
+
+        {/* PRODUCT LIST */}
+        <div
+          style={{
+            borderRadius: "8px",
+            overflow: "hidden",
+            border: "1px solid #eee",
+          }}
+        >
+          {/* TABLE HEADER */}
+          <div
+            style={{
+              background: "#fafafa",
+              padding: "8px 10px",
+              display: "grid",
+              gridTemplateColumns: "1.5fr 0.6fr 0.8fr 0.8fr",
+              fontWeight: 600,
+              fontSize: "12px",
+              borderBottom: "1px solid #eee",
+            }}
+          >
+            <span>Product</span>
+            <span style={{ textAlign: "center" }}>Qty</span>
+            <span style={{ textAlign: "center" }}>Rate</span>
+            <span style={{ textAlign: "right" }}>Total</span>
+          </div>
+
+          {/* TABLE ROWS */}
+          {selectedSale?.products?.map((p: any, i: any) => (
+            <div
+              key={i}
+              style={{
+                padding: "8px 10px",
+                display: "grid",
+                gridTemplateColumns: "1.5fr 0.6fr 0.8fr 0.8fr",
+                fontSize: "12px",
+                borderBottom: "1px solid #f0f0f0",
+              }}
+            >
+              <span>{p.productName}</span>
+              <span style={{ textAlign: "center" }}>{p.quantity}</span>
+              <span style={{ textAlign: "center" }}>
+                ₹ {Math.floor(p.productPrice)}
+              </span>
+              <span style={{ textAlign: "right" }}>
+                ₹ {Math.floor(p.total)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* ADDITIONAL CHARGES */}
+        <div style={{ marginTop: "12px" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: "12px",
+              marginBottom: "4px",
+            }}
+          >
+            <span>Kata:</span>
+            <span>{selectedSale?.kata || 0}</span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: "12px",
+              marginBottom: "4px",
+            }}
+          >
+            <span>Transport:</span>
+            <span>₹ {selectedSale?.transport || 0}</span>
+          </div>
+        </div>
       </div>
+
       <div
         id="bill-to-capture-top"
         style={{
           position: "absolute",
           top: "-9999px",
           left: "-9999px",
-          padding: "16px",
-          backgroundColor: "#fff",
+          width: "440px",
+          padding: "20px",
+          backgroundColor: "#ffffff",
           fontFamily: "'Inter', sans-serif",
+          fontSize: "13px",
+          color: "#222",
+          borderRadius: "10px",
+          boxShadow: "0 0 6px rgba(0,0,0,0.15)",
         }}
       >
-        <h3 style={{ margin: 0, marginBottom: 8 }}>Bill</h3>
-        <table
+        {/* HEADER */}
+        <div style={{ textAlign: "center", marginBottom: "14px" }}>
+          <h2
+            id="bill-heading-top"
+            style={{
+              margin: 0,
+              fontSize: "18px",
+              fontWeight: "700",
+            }}
+          >
+            Sales Summary
+          </h2>
+        </div>
+
+        {/* TABLE */}
+        <div
           style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            textAlign: "center", // horizontal center
-            verticalAlign: "middle",
+            border: "1px solid #eee",
+            borderRadius: "8px",
+            overflow: "hidden",
           }}
         >
-          <thead>
-            <tr>
-              <th style={{ border: "1px solid #ccc", padding: "4px" }}>#</th>
-              <th style={{ border: "1px solid #ccc", padding: "4px" }}>Date</th>
-              <th style={{ border: "1px solid #ccc", padding: "4px" }}>
-                Total (₹)
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {selectedRows.map((sale, index) => (
-              <tr key={sale.key}>
-                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
-                  {index + 1}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
-                  {dayjs(sale.date).format("DD-MM-YYYY")}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "4px" }}>
-                  ₹ {Math.floor(sale.totalAmount)}
-                </td>
-              </tr>
-            ))}
-            <tr>
-              <td
-                colSpan={2}
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "4px",
-                  textAlign: "right",
-                  fontWeight: 600,
-                }}
-              >
-                Grand Total
-              </td>
-              <td
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "4px",
-                  fontWeight: 600,
-                }}
-              >
-                ₹ {Math.floor(selectedTotalAmount)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          {/* Table Header */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "0.4fr 1fr 0.7fr 0.9fr 1fr",
+              background: "#fafafa",
+              padding: "8px 10px",
+              fontWeight: 600,
+              fontSize: "12px",
+              borderBottom: "1px solid #eee",
+            }}
+          >
+            <span>#</span>
+            <span>Date</span>
+            <span style={{ textAlign: "right" }}>Katta</span>
+            <span style={{ textAlign: "right" }}>Transport</span>
+            <span style={{ textAlign: "right" }}>Total (₹)</span>
+          </div>
+
+          {/* Rows */}
+          {selectedRows.map((sale, index) => (
+            <div
+              key={index}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "0.4fr 1fr 0.7fr 0.9fr 1fr",
+                padding: "8px 10px",
+                fontSize: "12px",
+                borderBottom: "1px solid #f0f0f0",
+              }}
+            >
+              <span>{index + 1}</span>
+              <span>{dayjs(sale.date).format("DD-MM-YYYY")}</span>
+
+              <span style={{ textAlign: "right" }}>{sale.katta || 0}</span>
+
+              <span style={{ textAlign: "right" }}>
+                ₹ {sale.transport || 0}
+              </span>
+
+              <span style={{ textAlign: "right", fontWeight: 500 }}>
+                ₹ {Math.floor(sale.finalTotal || sale.totalAmount)}
+              </span>
+            </div>
+          ))}
+
+          {/* GRAND TOTAL */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.4fr 0.7fr 0.9fr 1fr",
+              padding: "10px",
+              fontWeight: 700,
+              fontSize: "13px",
+              background: "#f7f7f7",
+            }}
+          >
+            <span>Grand Total</span>
+
+            <span style={{ textAlign: "right" }}>
+              {selectedRows.reduce((sum, r) => sum + Number(r.katta || 0), 0)}
+            </span>
+
+            <span style={{ textAlign: "right" }}>
+              ₹{" "}
+              {selectedRows.reduce(
+                (sum, r) => sum + Number(r.transport || 0),
+                0
+              )}
+            </span>
+
+            <span style={{ textAlign: "right" }}>
+              ₹{" "}
+              {Math.floor(
+                selectedRows.reduce(
+                  (sum, r) => sum + Number(r.finalTotal || r.totalAmount || 0),
+                  0
+                )
+              )}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
